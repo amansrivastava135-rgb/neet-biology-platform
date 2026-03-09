@@ -56,15 +56,15 @@ export function Footer() {
             <ul className="space-y-3 text-sm">
               <li className="flex items-center gap-2 text-sidebar-foreground/70">
                 <Mail className="h-4 w-4" />
-                contact@drsrivastav.edu
+                Dr. Amankumar Srivastav
               </li>
               <li className="flex items-center gap-2 text-sidebar-foreground/70">
                 <Phone className="h-4 w-4" />
-                +91 98765 43210
+                +91 9004811546
               </li>
               <li className="flex items-start gap-2 text-sidebar-foreground/70">
                 <MapPin className="h-4 w-4 mt-0.5" />
-                <span>New Delhi, India</span>
+                <span>Mumbai, India</span>
               </li>
             </ul>
           </div>

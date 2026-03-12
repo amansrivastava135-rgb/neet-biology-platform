@@ -10,11 +10,7 @@ import { MockTestResult } from "@/components/mock-test/mock-test-result";
 
 export type MockTestState = "selection" | "test" | "result";
 
-export type MockTestAnswer = {
-  questionId: number;
-  selectedOption: string | null;
-  isMarkedForReview: boolean;
-};
+export type MockTestAnswer = string | null;
 
 function MockTestContent() {
   const { user } = useAuth();

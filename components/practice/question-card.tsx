@@ -44,8 +44,10 @@ export function QuestionCard({
 
 
   const handleOptionSelect = (option: string) => {
-    if (showAnswer) return;
     setSelectedOption(option);
+    if (onAnswer) {
+      onAnswer(option);
+    }
   };
 
   const handleCheckAnswer = () => {

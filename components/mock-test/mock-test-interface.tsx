@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -17,11 +17,10 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Clock, Flag, ChevronLeft, ChevronRight, BookOpen } from "lucide-react";
 import { sampleQuestions, type Question } from "@/lib/data";
-import type { MockTestAnswer } from "@/app/mock-test/page";
 
 type MockTestInterfaceProps = {
   testType: "full" | "preview";
-  onSubmit: (answers: MockTestAnswer[]) => void;
+  onSubmit: (answers: (string | null)[]) => void;
   isPaidUser: boolean;
 };
 
@@ -33,12 +32,11 @@ export function MockTestInterface({ testType, onSubmit, isPaidUser }: MockTestIn
   const totalTime = testType === "full" ? 180 * 60 : 10 * 60; // seconds
 
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [answers, setAnswers] = useState<MockTestAnswer[]>(
-    questions.map((q) => ({
-      questionId: q.id,
-      selectedOption: null,
-      isMarkedForReview: false,
-    }))
+  const [answers, setAnswers] = useState<(string | null)[]>(
+    () => Array(questions.length).fill(null)
+  );
+  const [markedForReview, setMarkedForReview] = useState<boolean[]>(
+    () => Array(questions.length).fill(false)
   );
   const [timeLeft, setTimeLeft] = useState(totalTime);
   const [showSubmitDialog, setShowSubmitDialog] = useState(false);
@@ -72,28 +70,32 @@ export function MockTestInterface({ testType, onSubmit, isPaidUser }: MockTestIn
   const currentQuestion = questions[currentIndex];
   const currentAnswer = answers[currentIndex];
 
+  const handleAnswer = (index: number, option: string) => {
+    setAnswers((prev) => {
+      const updated = [...prev];
+      updated[index] = option;
+      return updated;
+    });
+  };
+
   const handleOptionSelect = (option: string) => {
-    setAnswers((prev) =>
-      prev.map((a, i) =>
-        i === currentIndex ? { ...a, selectedOption: option } : a
-      )
-    );
+    handleAnswer(currentIndex, option);
   };
 
   const handleMarkForReview = () => {
-    setAnswers((prev) =>
-      prev.map((a, i) =>
-        i === currentIndex ? { ...a, isMarkedForReview: !a.isMarkedForReview } : a
-      )
-    );
+    setMarkedForReview((prev) => {
+      const updated = [...prev];
+      updated[currentIndex] = !updated[currentIndex];
+      return updated;
+    });
   };
 
   const handleClearResponse = () => {
-    setAnswers((prev) =>
-      prev.map((a, i) =>
-        i === currentIndex ? { ...a, selectedOption: null } : a
-      )
-    );
+    setAnswers((prev) => {
+      const updated = [...prev];
+      updated[currentIndex] = null;
+      return updated;
+    });
   };
 
   const handleSubmit = () => {
@@ -104,10 +106,10 @@ export function MockTestInterface({ testType, onSubmit, isPaidUser }: MockTestIn
     setCurrentIndex(index);
   };
 
-  const getQuestionStatus = (answer: MockTestAnswer) => {
-    if (answer.isMarkedForReview && answer.selectedOption) return "review-answered";
-    if (answer.isMarkedForReview) return "review";
-    if (answer.selectedOption) return "answered";
+  const getQuestionStatus = (answer: string | null, index: number) => {
+    if (markedForReview[index] && answer) return "review-answered";
+    if (markedForReview[index]) return "review";
+    if (answer) return "answered";
     return "not-visited";
   };
 
@@ -124,8 +126,8 @@ export function MockTestInterface({ testType, onSubmit, isPaidUser }: MockTestIn
     }
   };
 
-  const answeredCount = answers.filter((a) => a.selectedOption).length;
-  const reviewCount = answers.filter((a) => a.isMarkedForReview).length;
+  const answeredCount = answers.filter(Boolean).length;
+  const reviewCount = markedForReview.filter(Boolean).length;
 
   return (
     <div className="min-h-screen bg-background">
@@ -199,7 +201,7 @@ export function MockTestInterface({ testType, onSubmit, isPaidUser }: MockTestIn
                     <button
                       key={key}
                       className={`w-full p-4 text-left rounded-lg border transition-all flex items-start gap-3 ${
-                        currentAnswer.selectedOption === key
+                        currentAnswer === key
                           ? "border-primary bg-primary/10"
                           : "border-border hover:border-primary/50 hover:bg-muted/50"
                       }`}
@@ -218,10 +220,10 @@ export function MockTestInterface({ testType, onSubmit, isPaidUser }: MockTestIn
                   <Button
                     variant="outline"
                     onClick={handleMarkForReview}
-                    className={currentAnswer.isMarkedForReview ? "border-purple-500 text-purple-600" : ""}
+                    className={markedForReview[currentIndex] ? "border-purple-500 text-purple-600" : ""}
                   >
                     <Flag className="h-4 w-4 mr-2" />
-                    {currentAnswer.isMarkedForReview ? "Marked for Review" : "Mark for Review"}
+                    {markedForReview[currentIndex] ? "Marked for Review" : "Mark for Review"}
                   </Button>
                   <Button variant="ghost" onClick={handleClearResponse}>
                     Clear Response
@@ -287,7 +289,7 @@ export function MockTestInterface({ testType, onSubmit, isPaidUser }: MockTestIn
                     <button
                       key={index}
                       className={`h-8 w-8 rounded text-xs font-medium transition-all ${
-                        getStatusColor(getQuestionStatus(answer))
+                        getStatusColor(getQuestionStatus(answer, index))
                       } ${currentIndex === index ? "ring-2 ring-primary ring-offset-2" : ""}`}
                       onClick={() => goToQuestion(index)}
                     >

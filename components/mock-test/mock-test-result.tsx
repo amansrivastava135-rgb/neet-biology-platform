@@ -148,9 +148,9 @@ export function MockTestResult({ answers, testType, onRetake }: MockTestResultPr
           <CardContent>
             <div className="space-y-4 max-h-96 overflow-y-auto">
               {questions.map((question, index) => {
-                const answer = answers[index];
-                const isCorrect = answer?.selectedOption === question.correctAnswer;
-                const wasAttempted = !!answer?.selectedOption;
+                const userAnswer = answers[index];
+                const isCorrect = userAnswer === question.correctAnswer;
+                const wasAttempted = !!userAnswer;
 
                 return (
                   <div key={index} className="p-4 border border-border rounded-lg">
@@ -169,8 +169,10 @@ export function MockTestResult({ answers, testType, onRetake }: MockTestResultPr
                       )}
                     </div>
                     <div className="text-sm text-muted-foreground">
-                      {wasAttempted && !isCorrect && (
-                        <p>Your answer: {answer?.selectedOption} - {question.options[answer?.selectedOption as keyof typeof question.options]}</p>
+                      {wasAttempted && (
+                        <p>
+                          Your answer: {userAnswer} - {question.options[userAnswer as keyof typeof question.options]}
+                        </p>
                       )}
                       <p className="text-green-600">
                         Correct answer: {question.correctAnswer} - {question.options[question.correctAnswer]}

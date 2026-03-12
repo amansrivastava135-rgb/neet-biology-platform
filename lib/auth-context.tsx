@@ -6,10 +6,25 @@ export type User = {
   id: string;
   email: string;
   name: string;
+  // legacy boolean used throughout the UI for quick checks
   isPaid: boolean;
+  // subscription details
+  subscription?: "free" | "active" | "expired";
+  plan?: string;
+  expiryDate?: string; // ISO string (legacy)
+  subscription_start?: string; // ISO string for 365-day subscription
+  subscription_end?: string; // ISO string
+  // device tracking to prevent account sharing
+  devices?: string[];
+  // active test session tracking
+  activeTestSession?: {
+    sessionId: string;
+    startTime: string; // ISO string
+    deviceId: string;
+  };
   isAdmin: boolean;
   subscribedAt?: Date;
-  expiresAt?: Date;
+  expiresAt?: Date; // kept for backwards compatibility
 };
 
 export type UserProgress = {
@@ -26,9 +41,62 @@ type AuthContextType = {
   signup: (email: string, password: string, name: string) => Promise<boolean>;
   logout: () => void;
   updateProgress: (chapterId: number, isCorrect: boolean) => void;
+  // subscription helpers
+  updateUser: (u: User) => void;
+  activateSubscription: (plan: string, days: number) => void;
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+// helpers for working with the new subscription schema
+function migrateUser(u: User): User {
+  // ensure subscription fields exist for older records
+  const migrated = { ...u } as User;
+  if (migrated.subscription === undefined) {
+    migrated.subscription = migrated.isPaid ? "active" : "free";
+  }
+  if (migrated.expiryDate === undefined && migrated.expiresAt) {
+    migrated.expiryDate = (migrated.expiresAt as Date).toISOString();
+  }
+  
+  // check if subscription_end has passed (for 365-day subscriptions)
+  if (migrated.subscription === "active" && migrated.subscription_end) {
+    const now = new Date();
+    const endDate = new Date(migrated.subscription_end);
+    if (now.getTime() > endDate.getTime()) {
+      migrated.subscription = "expired";
+      migrated.isPaid = false;
+    } else {
+      migrated.isPaid = true;
+    }
+    return migrated;
+  }
+  
+  // calculate isPaid based on legacy expiryDate
+  if (migrated.subscription === "active" && migrated.expiryDate) {
+    migrated.isPaid = new Date(migrated.expiryDate).getTime() > Date.now();
+  } else {
+    migrated.isPaid = false;
+  }
+  return migrated;
+}
+
+function applySubscription(u: User, plan: string, days: number): User {
+  const now = new Date();
+  const expiry = new Date(now.getTime() + days * 24 * 60 * 60 * 1000);
+  const updated: User = {
+    ...u,
+    subscription: "active",
+    plan,
+    subscription_start: now.toISOString(),
+    subscription_end: expiry.toISOString(),
+    // keep legacy fields for backwards compat
+    expiryDate: expiry.toISOString(),
+    isPaid: true,
+    subscribedAt: now,
+  };
+  return updated;
+}
 
 const DEMO_USERS: Record<string, { password: string; user: User }> = {
   "demo@example.com": {
@@ -74,16 +142,42 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   });
   const [isLoading, setIsLoading] = useState(true);
 
+  // recalc paid flag if expiry changes or passes
+  useEffect(() => {
+    if (user && user.expiryDate) {
+      const nowPaid = new Date(user.expiryDate).getTime() > Date.now();
+      if (user.isPaid !== nowPaid) {
+        const updated: User = {
+          ...user,
+          isPaid: nowPaid,
+          subscription: nowPaid ? "active" : "free",
+        };
+        setUser(updated);
+        localStorage.setItem("neet_user", JSON.stringify(updated));
+      }
+    }
+  }, [user]);
+
   useEffect(() => {
     // Check for stored user session
     const storedUser = localStorage.getItem("neet_user");
     const storedProgress = localStorage.getItem("neet_progress");
     
     if (storedUser) {
-      setUser(JSON.parse(storedUser));
+      try {
+        const parsed: User = JSON.parse(storedUser);
+        setUser(migrateUser(parsed));
+      } catch {
+        // ignore
+        setUser(null);
+      }
     }
     if (storedProgress) {
-      setProgress(JSON.parse(storedProgress));
+      try {
+        setProgress(JSON.parse(storedProgress));
+      } catch {
+        // ignore
+      }
     }
     setIsLoading(false);
   }, []);
@@ -94,16 +188,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const demoUser = DEMO_USERS[email];
     if (demoUser && demoUser.password === password) {
-      setUser(demoUser.user);
-      localStorage.setItem("neet_user", JSON.stringify(demoUser.user));
+      const migrated = migrateUser(demoUser.user);
+      setUser(migrated);
+      localStorage.setItem("neet_user", JSON.stringify(migrated));
       return true;
     }
 
     // Check local storage for registered users
     const registeredUsers = JSON.parse(localStorage.getItem("neet_registered_users") || "{}");
     if (registeredUsers[email] && registeredUsers[email].password === password) {
-      setUser(registeredUsers[email].user);
-      localStorage.setItem("neet_user", JSON.stringify(registeredUsers[email].user));
+      const migrated = migrateUser(registeredUsers[email].user);
+      setUser(migrated);
+      localStorage.setItem("neet_user", JSON.stringify(migrated));
       return true;
     }
 
@@ -128,6 +224,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       name,
       isPaid: false,
       isAdmin: false,
+      subscription: "free",
     };
 
     registeredUsers[email] = { password, user: newUser };
@@ -140,6 +237,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = () => {
     setUser(null);
     localStorage.removeItem("neet_user");
+  };
+
+  const updateUser = (u: User) => {
+    const migrated = migrateUser(u);
+    setUser(migrated);
+    localStorage.setItem("neet_user", JSON.stringify(migrated));
+  };
+
+  const activateSubscription = (plan: string, days: number) => {
+    if (!user) return;
+    const updated = applySubscription(user, plan, days);
+    const migrated = migrateUser(updated);
+    setUser(migrated);
+    localStorage.setItem("neet_user", JSON.stringify(migrated));
   };
 
   const updateProgress = (chapterId: number, isCorrect: boolean) => {
@@ -162,7 +273,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ user, progress, isLoading, login, signup, logout, updateProgress }}
+      value={{ user, progress, isLoading, login, signup, logout, updateProgress, updateUser, activateSubscription }}
     >
       {children}
     </AuthContext.Provider>

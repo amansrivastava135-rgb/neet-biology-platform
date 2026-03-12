@@ -7,43 +7,115 @@ import { AuthProvider, useAuth } from "@/lib/auth-context";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Check, X, Shield, Zap, BookOpen, FileText, BarChart3, Clock, Loader2 } from "lucide-react";
+import { Shield, Zap, BookOpen, FileText, BarChart3, Clock, Check, X } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { PRICING, calculateSubscriptionEnd } from "@/lib/pricing-config";
 
+// simple feature list driven by spec
 const features = [
-  { name: "Demo Questions", free: "10 questions", premium: "Unlimited" },
-  { name: "Chapter Access", free: "2 chapters", premium: "All 38 chapters" },
-  { name: "NEET PYQs", free: false, premium: true },
-  { name: "Full Mock Tests", free: false, premium: true },
-  { name: "Performance Analytics", free: "Basic", premium: "Advanced" },
-  { name: "Weak Chapter Analysis", free: false, premium: true },
-  { name: "Progress Tracking", free: true, premium: true },
+  { name: "50 Mock Tests", free: false, premium: true },
+  { name: "Chapter Tests", free: false, premium: true },
+  { name: "Performance Analytics", free: false, premium: true },
+  { name: "Dashboard Tracking", free: false, premium: true },
 ];
 
 function PricingContent() {
-  const { user } = useAuth();
-  const [showPaymentDialog, setShowPaymentDialog] = useState(false);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [paymentSuccess, setPaymentSuccess] = useState(false);
+  const { user, activateSubscription, updateUser } = useAuth();
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const router = useRouter();
 
-  const handleSubscribe = async () => {
+  // load razorpay script dynamically
+  const loadRazorpay = () => {
+    return new Promise<void>((resolve, reject) => {
+      if (typeof window === "undefined") {
+        reject(new Error("window not defined"));
+        return;
+      }
+      if ((window as any).Razorpay) {
+        resolve();
+        return;
+      }
+      const script = document.createElement("script");
+      script.src = "https://checkout.razorpay.com/v1/checkout.js";
+      script.onload = () => resolve();
+      script.onerror = () => reject(new Error("Failed to load Razorpay script"));
+      document.body.appendChild(script);
+    });
+  };
+
+  const handleBuy = async () => {
     if (!user) {
+      router.push("/login");
       return;
     }
-    setIsProcessing(true);
-    // Simulate payment processing
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    setIsProcessing(false);
-    setPaymentSuccess(true);
+    setError(null);
+    setLoading(true);
+    try {
+      // if key is not configured we simulate purchase for development
+      if (!process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID) {
+        activateSubscription("NEET Test Series", 365);
+        router.push("/dashboard");
+        return;
+      }
+
+      await loadRazorpay();
+      const orderRes = await fetch("/api/payment/create-order", {
+        method: "POST",
+      }).then((r) => r.json());
+
+      const options = {
+        key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
+        amount: orderRes.amount,
+        currency: orderRes.currency,
+        name: "NEET Biology",
+        description: PRICING.premium.description,
+        order_id: orderRes.id,
+        handler: async function (response: any) {
+          const verifyRes = await fetch("/api/payment/verify", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_signature: response.razorpay_signature,
+            }),
+          }).then((r) => r.json());
+
+          if (verifyRes.success) {
+            if (verifyRes.user) {
+              // merge returned subscription info
+              const updatedUser = {
+                ...user,
+                ...verifyRes.user,
+                isPaid: true,
+              };
+              updateUser(updatedUser);
+            }
+            // ensure activation in case API didn't send details
+            activateSubscription("NEET Test Series", PRICING.premium.durationDays);
+            router.push("/dashboard");
+          } else {
+            setError("Payment verification failed. Please contact support.");
+          }
+        },
+        prefill: {
+          email: user.email,
+          name: user.name,
+        },
+        theme: {
+          color: "#3399cc",
+        },
+      };
+      const rzp = new (window as any).Razorpay(options);
+      rzp.open();
+    } catch (err: any) {
+      console.error(err);
+      setError("Unable to initiate payment. Please try again later.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -64,6 +136,9 @@ function PricingContent() {
           </div>
 
           {/* Pricing Cards */}
+          {error && (
+            <div className="mb-4 text-center text-red-600">{error}</div>
+          )}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto mb-16">
             {/* Free Plan */}
             <Card className="border-border">
@@ -112,13 +187,13 @@ function PricingContent() {
               </Badge>
               <CardHeader className="text-center pb-4">
                 <CardTitle className="text-2xl">Premium</CardTitle>
-                <CardDescription>Complete NEET preparation</CardDescription>
+                <CardDescription>{PRICING.premium.description}</CardDescription>
                 <div className="mt-4">
-                  <span className="text-4xl font-bold text-foreground">Rs.99</span>
-                  <span className="text-muted-foreground">/month</span>
+                  <span className="text-4xl font-bold text-foreground">Rs.{PRICING.premium.price}</span>
+                  <span className="block text-sm text-muted-foreground mt-1">{PRICING.premium.label}</span>
                 </div>
                 <p className="text-sm text-muted-foreground mt-2">
-                  Less than Rs.4 per day
+                  {PRICING.premium.displayText}
                 </p>
               </CardHeader>
               <CardContent className="space-y-6">
@@ -140,8 +215,12 @@ function PricingContent() {
                     Already Subscribed
                   </Button>
                 ) : user ? (
-                  <Button className="w-full" onClick={() => setShowPaymentDialog(true)}>
-                    Upgrade to Premium
+                  <Button
+                    className="w-full"
+                    onClick={handleBuy}
+                    disabled={loading}
+                  >
+                    {loading ? "Processing..." : `Buy Now for ₹${PRICING.premium.price}`}
                   </Button>
                 ) : (
                   <Button className="w-full" asChild>
@@ -260,75 +339,6 @@ function PricingContent() {
       </main>
       <Footer />
 
-      {/* Payment Dialog */}
-      <Dialog open={showPaymentDialog} onOpenChange={setShowPaymentDialog}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>
-              {paymentSuccess ? "Payment Successful!" : "Complete Your Purchase"}
-            </DialogTitle>
-            <DialogDescription>
-              {paymentSuccess 
-                ? "Your premium access has been activated."
-                : "Premium Plan - Rs.99/month"}
-            </DialogDescription>
-          </DialogHeader>
-          
-          {paymentSuccess ? (
-            <div className="py-6 text-center">
-              <div className="h-16 w-16 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-4">
-                <Check className="h-8 w-8 text-green-600" />
-              </div>
-              <p className="text-muted-foreground mb-4">
-                You now have full access to all premium features.
-              </p>
-              <Button asChild className="w-full">
-                <Link href="/dashboard">Go to Dashboard</Link>
-              </Button>
-            </div>
-          ) : (
-            <div className="space-y-4 py-4">
-              <div className="space-y-2">
-                <Label htmlFor="cardNumber">Card Number</Label>
-                <Input id="cardNumber" placeholder="1234 5678 9012 3456" />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="expiry">Expiry Date</Label>
-                  <Input id="expiry" placeholder="MM/YY" />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="cvv">CVV</Label>
-                  <Input id="cvv" placeholder="123" />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="name">Name on Card</Label>
-                <Input id="name" placeholder="Your name" />
-              </div>
-              <div className="pt-4">
-                <Button 
-                  className="w-full" 
-                  onClick={handleSubscribe}
-                  disabled={isProcessing}
-                >
-                  {isProcessing ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Processing...
-                    </>
-                  ) : (
-                    "Pay Rs.99"
-                  )}
-                </Button>
-                <p className="text-xs text-muted-foreground text-center mt-2">
-                  Secure payment powered by Stripe
-                </p>
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

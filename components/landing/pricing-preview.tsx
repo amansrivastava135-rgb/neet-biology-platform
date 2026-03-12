@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Check, X } from "lucide-react";
+import { PRICING } from "@/lib/pricing-config";
 
 const plans = [
   {
@@ -23,9 +24,9 @@ const plans = [
   },
   {
     name: "Premium",
-    price: "99",
-    period: "/month",
-    description: "Complete NEET preparation",
+    price: PRICING.premium.price.toString(),
+    period: PRICING.premium.label,
+    description: PRICING.premium.description,
     features: [
       { text: "All 38 Chapters", included: true },
       { text: "3800+ MCQs", included: true },
@@ -38,6 +39,7 @@ const plans = [
     href: "/pricing",
     popular: true,
   },
+
 ];
 
 export function PricingPreview() {
@@ -74,7 +76,7 @@ export function PricingPreview() {
                     {plan.price === "0" ? "Free" : `₹${plan.price}`}
                   </span>
                   {plan.period && (
-                    <span className="text-muted-foreground">{plan.period}</span>
+                    <span className="block text-sm text-muted-foreground mt-1">{plan.period}</span>
                   )}
                 </div>
               </CardHeader>

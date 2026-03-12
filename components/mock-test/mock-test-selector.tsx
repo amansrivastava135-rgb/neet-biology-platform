@@ -3,8 +3,10 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Clock, FileQuestion, Lock, Play, Sparkles, Target } from "lucide-react";
+import { Clock, FileQuestion, Lock, Play, Sparkles, Target, AlertCircle } from "lucide-react";
 import Link from "next/link";
+import { getRemainingDays } from "@/lib/subscription-utils";
+import { useAuth } from "@/lib/auth-context";
 
 type MockTestSelectorProps = {
   onStartTest: (type: "full" | "preview") => void;
@@ -12,6 +14,8 @@ type MockTestSelectorProps = {
 };
 
 export function MockTestSelector({ onStartTest, isPaidUser }: MockTestSelectorProps) {
+  const { user } = useAuth();
+  const remainingDays = user ? getRemainingDays(user) : 0;
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="text-center mb-8">
@@ -19,6 +23,16 @@ export function MockTestSelector({ onStartTest, isPaidUser }: MockTestSelectorPr
         <p className="text-muted-foreground">
           Practice with full-length NEET pattern tests to build exam temperament
         </p>
+        {isPaidUser && (
+          <div className="mt-4 flex items-center justify-center gap-2">
+            <Badge variant="secondary">Premium Active</Badge>
+            {remainingDays > 0 && (
+              <span className="text-sm text-muted-foreground">
+                {remainingDays} days remaining
+              </span>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">

@@ -1,0 +1,31 @@
+# Query: setcurrentquestio
+# ContextLines: 1
+
+6 results - 1 file
+
+app\practice\page.tsx:
+  21    const [selectedChapter, setSelectedChapter] = useState<number | null>(null);
+  22:   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+  23    const [showingDemo, setShowingDemo] = useState(isDemo);
+
+  44      setSelectedChapter(chapterId);
+  45:     setCurrentQuestionIndex(0);
+  46      setShowingDemo(false);
+
+  50      if (currentQuestionIndex < questions.length - 1) {
+  51:       setCurrentQuestionIndex(currentQuestionIndex + 1);
+  52      } else {
+  53        alert("Test Completed!");
+  54      }
+
+  56      if (currentQuestionIndex > 0) {
+  57:       setCurrentQuestionIndex(currentQuestionIndex - 1);
+  58      }
+
+  63      setShowingDemo(false);
+  64:     setCurrentQuestionIndex(0);
+  65    };
+
+  69      setSelectedChapter(null);
+  70:     setCurrentQuestionIndex(0);
+  71    };

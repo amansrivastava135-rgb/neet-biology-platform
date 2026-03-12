@@ -56,7 +56,7 @@ export function Footer() {
             <ul className="space-y-3 text-sm">
               <li className="flex items-center gap-2 text-sidebar-foreground/70">
                 <Mail className="h-4 w-4" />
-                Dr. Amankumar Srivastav
+                mail
               </li>
               <li className="flex items-center gap-2 text-sidebar-foreground/70">
                 <Phone className="h-4 w-4" />

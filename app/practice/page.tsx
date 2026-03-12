@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
 import { AuthProvider, useAuth } from "@/lib/auth-context";
 import { ChapterSelector } from "@/components/practice/chapter-selector";
 import { QuestionCard } from "@/components/practice/question-card";
+import { MockTestResult } from "@/components/mock-test/mock-test-result";
 import { getDemoQuestions, getQuestionsByChapter, type Question } from "@/lib/data";
 import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -21,6 +22,8 @@ function PracticeContent() {
   const [selectedChapter, setSelectedChapter] = useState<number | null>(null);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [showingDemo, setShowingDemo] = useState(isDemo);
+  const [showResult, setShowResult] = useState(false);
+  const [answers, setAnswers] = useState<(string | null)[]>([]);
 
   const getQuestions = (): Question[] => {
     if (showingDemo || (!user && !selectedChapter)) {
@@ -37,8 +40,16 @@ function PracticeContent() {
     return [];
   };
 
+  const initializeAnswers = (count: number) => Array(count).fill(null) as (string | null)[];
+
   const questions = getQuestions();
   const currentQuestion = questions[currentQuestionIndex];
+
+  useEffect(() => {
+    if (showingDemo) {
+      setAnswers(initializeAnswers(questions.length));
+    }
+  }, [showingDemo, questions.length]);
 
   const handleChapterSelect = (chapterId: number) => {
     setSelectedChapter(chapterId);
@@ -49,6 +60,8 @@ function PracticeContent() {
   const handleNextQuestion = () => {
     if (currentQuestionIndex < questions.length - 1) {
       setCurrentQuestionIndex(currentQuestionIndex + 1);
+    } else {
+      alert("Test Completed");
     }
   };
 
@@ -61,6 +74,7 @@ function PracticeContent() {
   const handleBackToChapters = () => {
     setSelectedChapter(null);
     setShowingDemo(false);
+    setShowResult(false);
     setCurrentQuestionIndex(0);
   };
 
@@ -68,6 +82,26 @@ function PracticeContent() {
     setShowingDemo(true);
     setSelectedChapter(null);
     setCurrentQuestionIndex(0);
+    setShowResult(false);
+    setAnswers(initializeAnswers(questions.length));
+  };
+
+  const handleDemoAnswer = (option: string) => {
+    setAnswers((prev) => {
+      const updated = [...prev];
+      updated[currentQuestionIndex] = option;
+      return updated;
+    });
+  };
+
+  const handleSubmitDemo = () => {
+    setShowResult(true);
+  };
+
+  const handleRetakeDemo = () => {
+    setShowResult(false);
+    setCurrentQuestionIndex(0);
+    setAnswers(initializeAnswers(questions.length));
   };
 
   // Show chapter selection if no chapter selected and not showing demo
@@ -90,13 +124,22 @@ function PracticeContent() {
         </Button>
       </div>
 
-      {currentQuestion ? (
+      {showResult && showingDemo ? (
+        <MockTestResult
+          answers={answers}
+          testType="preview"
+          onRetake={handleRetakeDemo}
+        />
+      ) : currentQuestion ? (
         <QuestionCard
           question={currentQuestion}
           questionNumber={currentQuestionIndex + 1}
           totalQuestions={questions.length}
           onNext={handleNextQuestion}
           onPrevious={handlePreviousQuestion}
+          onSubmit={handleSubmitDemo}
+          onAnswer={handleDemoAnswer}
+          selectedOption={answers[currentQuestionIndex]}
           isDemo={showingDemo}
           isLimited={!user?.isPaid && !showingDemo}
         />

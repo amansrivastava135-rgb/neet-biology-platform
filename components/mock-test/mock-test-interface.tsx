@@ -241,14 +241,21 @@ export function MockTestInterface({ testType, onSubmit, isPaidUser }: MockTestIn
                 <ChevronLeft className="h-4 w-4" />
                 Previous
               </Button>
-              <Button
-                onClick={() => setCurrentIndex((prev) => Math.min(questions.length - 1, prev + 1))}
-                disabled={currentIndex === questions.length - 1}
-                className="gap-2"
-              >
-                Next
-                <ChevronRight className="h-4 w-4" />
-              </Button>
+
+              {currentIndex === questions.length - 1 ? (
+                <Button variant="destructive" onClick={handleSubmit} className="gap-2">
+                  Submit Test
+                </Button>
+              ) : (
+                <Button
+                  onClick={() => setCurrentIndex((prev) => Math.min(questions.length - 1, prev + 1))}
+                  disabled={currentIndex === questions.length - 1}
+                  className="gap-2"
+                >
+                  Next
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              )}
             </div>
           </div>
 

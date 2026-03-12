@@ -6,11 +6,10 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { getDemoQuestions } from "@/lib/data";
 import { CheckCircle, XCircle, MinusCircle, Trophy, Target, ArrowLeft, RotateCcw } from "lucide-react";
-import type { MockTestAnswer } from "@/app/mock-test/page";
 import Link from "next/link";
 
 type MockTestResultProps = {
-  answers: MockTestAnswer[];
+  answers: (string | null)[];
   testType: "full" | "preview";
   onRetake: () => void;
 };
@@ -26,10 +25,10 @@ export function MockTestResult({ answers, testType, onRetake }: MockTestResultPr
   answers.forEach((answer, index) => {
     const question = questions[index];
     if (!question) return;
-    
-    if (!answer.selectedOption) {
+
+    if (!answer) {
       unattempted++;
-    } else if (answer.selectedOption === question.correctAnswer) {
+    } else if (answer === question.correctAnswer) {
       correct++;
     } else {
       incorrect++;
@@ -39,9 +38,8 @@ export function MockTestResult({ answers, testType, onRetake }: MockTestResultPr
   const totalMarks = questions.length * 4;
   const obtainedMarks = correct * 4 - incorrect * 1;
   const percentage = Math.round((obtainedMarks / totalMarks) * 100);
-  const accuracy = answers.filter(a => a.selectedOption).length > 0
-    ? Math.round((correct / (correct + incorrect)) * 100)
-    : 0;
+  const answered = answers.filter((a) => a !== null).length;
+  const accuracy = answered > 0 ? Math.round((correct / answered) * 100) : 0;
 
   const getGrade = () => {
     if (percentage >= 90) return { grade: "Excellent", color: "text-green-600" };

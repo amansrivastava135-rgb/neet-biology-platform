@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -15,6 +15,9 @@ type QuestionCardProps = {
   totalQuestions: number;
   onNext: () => void;
   onPrevious: () => void;
+  onSubmit?: () => void;
+  onAnswer?: (option: string) => void;
+  selectedOption?: string | null;
   isDemo: boolean;
   isLimited: boolean;
 };
@@ -25,12 +28,20 @@ export function QuestionCard({
   totalQuestions,
   onNext,
   onPrevious,
+  onSubmit,
+  onAnswer,
+  selectedOption: selectedOptionProp,
   isDemo,
   isLimited,
 }: QuestionCardProps) {
-  const [selectedOption, setSelectedOption] = useState<string | null>(null);
+  const [selectedOption, setSelectedOption] = useState<string | null>(selectedOptionProp ?? null);
   const [showAnswer, setShowAnswer] = useState(false);
   const { user, updateProgress } = useAuth();
+
+  useEffect(() => {
+    setSelectedOption(selectedOptionProp ?? null);
+  }, [selectedOptionProp]);
+
 
   const handleOptionSelect = (option: string) => {
     if (showAnswer) return;
@@ -40,7 +51,7 @@ export function QuestionCard({
   const handleCheckAnswer = () => {
     if (!selectedOption) return;
     setShowAnswer(true);
-    
+
     // Update progress if user is logged in
     if (user) {
       const isCorrect = selectedOption === question.correctAnswer;
@@ -195,7 +206,11 @@ export function QuestionCard({
           Previous
         </Button>
 
-        {!showAnswer ? (
+        {isDemo && questionNumber === totalQuestions ? (
+          <Button onClick={onSubmit} disabled={!selectedOption} className="gap-2">
+            Submit Test
+          </Button>
+        ) : !showAnswer ? (
           <Button onClick={handleCheckAnswer} disabled={!selectedOption}>
             Check Answer
           </Button>

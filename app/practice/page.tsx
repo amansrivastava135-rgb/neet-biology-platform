@@ -4,6 +4,7 @@ import { useState, useMemo } from "react";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
 import { AuthProvider, useAuth } from "@/lib/auth-context";
+import { isPremium } from "@/lib/checkPremium";
 import { ChapterSelector } from "@/components/practice/chapter-selector";
 import { MockTestResult } from "@/components/mock-test/mock-test-result";
 import { TestEngine } from "@/components/test-engine/TestEngine";
@@ -15,6 +16,7 @@ import { Suspense } from "react";
 
 function PracticeContent() {
   const { user } = useAuth();
+  const isPaid = isPremium(user);
   const searchParams = useSearchParams();
   const isDemoParam = searchParams.get("demo") === "true";
 
@@ -32,7 +34,7 @@ function PracticeContent() {
     if (showingDemo) return getDemoQuestions();
     if (selectedChapter) {
       const qs = getQuestionsByChapter(selectedChapter);
-      if (!user?.isPaid && qs.length > 3) return qs.slice(0, 3);
+      if (!isPaid && qs.length > 3) return qs.slice(0, 3);
       return qs;
     }
     return [];
@@ -79,7 +81,7 @@ function PracticeContent() {
           url.searchParams.set("demo", "true");
           window.location.href = url.toString();
         }}
-        isPaidUser={user?.isPaid || false}
+        isPaidUser={isPaid}
       />
     );
   }
@@ -111,7 +113,7 @@ function PracticeContent() {
         totalTime={totalTime}
         storageKey={storageKey}
         onSubmit={handleSubmit}
-        isPaidUser={user?.isPaid || false}
+        isPaidUser={isPaid}
         testLabel={testLabel}
         initialTestType={testType}
       />

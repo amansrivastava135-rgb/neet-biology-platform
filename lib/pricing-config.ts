@@ -5,11 +5,12 @@
 
 export const PRICING = {
   premium: {
+    id: "premium",
     price: 499,
     currency: "INR",
     durationDays: 365,
     label: "1 Year Access",
-    description: "Complete NEET preparation access for 1 year",
+    description: "Complete NEET Biology preparation access for 1 year",
     displayText: "Unlimited access for 12 months",
   },
 };

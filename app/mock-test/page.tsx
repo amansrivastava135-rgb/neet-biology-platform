@@ -7,6 +7,7 @@ import { AuthProvider, useAuth } from "@/lib/auth-context";
 import { MockTestSelector } from "@/components/mock-test/mock-test-selector";
 import { MockTestInterface } from "@/components/mock-test/mock-test-interface";
 import { MockTestResult, type MockTestResultProps } from "@/components/mock-test/mock-test-result";
+import { PremiumGuard } from "@/components/premium-guard";
 import { type Question } from "@/lib/data";
 
 export type MockTestState = "selection" | "test" | "result";
@@ -21,6 +22,7 @@ type MockTestResultData = {
 
 function MockTestContent() {
   const { user } = useAuth();
+  const isPaid = user?.isPaid ?? false;
   const [testState, setTestState] = useState<MockTestState>("selection");
   const [testType, setTestType] = useState<"full" | "preview">("preview");
   const [resultData, setResultData] = useState<MockTestResultData | null>(null);
@@ -46,7 +48,6 @@ function MockTestContent() {
     setResultData(null);
   };
 
-  const isPaid = user?.isPaid || false;
   const label = testType === "full" ? "Full Mock Test" : "Demo Test";
 
   return (
@@ -91,6 +92,7 @@ function MockTestPage() {
 
 function MockTestContentWrapper({ onTestStateChange }: { onTestStateChange: (inTest: boolean) => void }) {
   const { user } = useAuth();
+  const isPaid = user?.isPaid ?? false;
   const [testState, setTestState] = useState<MockTestState>("selection");
   const [testType, setTestType] = useState<"full" | "preview">("preview");
   const [resultData, setResultData] = useState<MockTestResultData | null>(null);
@@ -118,7 +120,6 @@ function MockTestContentWrapper({ onTestStateChange }: { onTestStateChange: (inT
     onTestStateChange(false);
   };
 
-  const isPaid = user?.isPaid || false;
   const label = testType === "full" ? "Full Mock Test" : "Demo Test";
 
   return (
@@ -150,7 +151,9 @@ function MockTestContentWrapper({ onTestStateChange }: { onTestStateChange: (inT
 export default function MockTestPageWrapper() {
   return (
     <AuthProvider>
-      <MockTestPage />
+      <PremiumGuard>
+        <MockTestPage />
+      </PremiumGuard>
     </AuthProvider>
   );
 }

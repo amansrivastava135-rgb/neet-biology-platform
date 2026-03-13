@@ -9,11 +9,15 @@ export type User = {
   // legacy boolean used throughout the UI for quick checks
   isPaid: boolean;
   // subscription details
+  subscriptionPlan?: "free" | "premium" | "expired";
+  subscriptionStart?: string; // ISO string
+  subscriptionEnd?: string; // ISO string
+
   subscription?: "free" | "active" | "expired";
   plan?: string;
   expiryDate?: string; // ISO string (legacy)
-  subscription_start?: string; // ISO string for 365-day subscription
-  subscription_end?: string; // ISO string
+  subscription_start?: string; // ISO string for 365-day subscription (legacy)
+  subscription_end?: string; // ISO string (legacy)
   // device tracking to prevent account sharing
   devices?: string[];
   // active test session tracking
@@ -52,32 +56,43 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 function migrateUser(u: User): User {
   // ensure subscription fields exist for older records
   const migrated = { ...u } as User;
+  if (migrated.subscriptionPlan === undefined) {
+    migrated.subscriptionPlan = migrated.plan === "premium" ? "premium" : migrated.isPaid ? "premium" : "free";
+  }
   if (migrated.subscription === undefined) {
     migrated.subscription = migrated.isPaid ? "active" : "free";
   }
   if (migrated.expiryDate === undefined && migrated.expiresAt) {
     migrated.expiryDate = (migrated.expiresAt as Date).toISOString();
   }
-  
-  // check if subscription_end has passed (for 365-day subscriptions)
-  if (migrated.subscription === "active" && migrated.subscription_end) {
-    const now = new Date();
-    const endDate = new Date(migrated.subscription_end);
+
+  if (!migrated.subscriptionStart && migrated.subscription_start) {
+    migrated.subscriptionStart = migrated.subscription_start;
+  }
+  if (!migrated.subscriptionEnd && migrated.subscription_end) {
+    migrated.subscriptionEnd = migrated.subscription_end;
+  }
+
+  // Legacy 'expiryDate' should map to subscriptionEnd
+  if (!migrated.subscriptionEnd && migrated.expiryDate) {
+    migrated.subscriptionEnd = migrated.expiryDate;
+  }
+
+  // check if subscription has passed
+  const now = new Date();
+  if (migrated.subscriptionEnd) {
+    const endDate = new Date(migrated.subscriptionEnd);
     if (now.getTime() > endDate.getTime()) {
+      migrated.subscriptionPlan = "free";
       migrated.subscription = "expired";
       migrated.isPaid = false;
-    } else {
-      migrated.isPaid = true;
+      return migrated;
     }
-    return migrated;
   }
-  
-  // calculate isPaid based on legacy expiryDate
-  if (migrated.subscription === "active" && migrated.expiryDate) {
-    migrated.isPaid = new Date(migrated.expiryDate).getTime() > Date.now();
-  } else {
-    migrated.isPaid = false;
-  }
+
+  // still active
+  migrated.isPaid = (migrated.subscriptionPlan === "premium" && migrated.subscriptionEnd ? new Date(migrated.subscriptionEnd).getTime() > Date.now() : false);
+
   return migrated;
 }
 
@@ -86,6 +101,9 @@ function applySubscription(u: User, plan: string, days: number): User {
   const expiry = new Date(now.getTime() + days * 24 * 60 * 60 * 1000);
   const updated: User = {
     ...u,
+    subscriptionPlan: "premium",
+    subscriptionStart: now.toISOString(),
+    subscriptionEnd: expiry.toISOString(),
     subscription: "active",
     plan,
     subscription_start: now.toISOString(),
@@ -144,16 +162,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // recalc paid flag if expiry changes or passes
   useEffect(() => {
-    if (user && user.expiryDate) {
-      const nowPaid = new Date(user.expiryDate).getTime() > Date.now();
+    const endString = user?.subscriptionEnd || user?.subscription_end || user?.expiryDate;
+    if (user && endString) {
+      const nowPaid = new Date(endString).getTime() > Date.now();
       if (user.isPaid !== nowPaid) {
         const updated: User = {
           ...user,
           isPaid: nowPaid,
+          subscriptionPlan: nowPaid ? "premium" : "free",
           subscription: nowPaid ? "active" : "free",
         };
         setUser(updated);
         localStorage.setItem("neet_user", JSON.stringify(updated));
+        document.cookie = `neet_user=${encodeURIComponent(JSON.stringify(updated))}; path=/; max-age=${60 * 60 * 24 * 365}`;
       }
     }
   }, [user]);
@@ -191,6 +212,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const migrated = migrateUser(demoUser.user);
       setUser(migrated);
       localStorage.setItem("neet_user", JSON.stringify(migrated));
+      document.cookie = `neet_user=${encodeURIComponent(JSON.stringify(migrated))}; path=/; max-age=${60 * 60 * 24 * 365}`;
       return true;
     }
 
@@ -200,6 +222,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const migrated = migrateUser(registeredUsers[email].user);
       setUser(migrated);
       localStorage.setItem("neet_user", JSON.stringify(migrated));
+      document.cookie = `neet_user=${encodeURIComponent(JSON.stringify(migrated))}; path=/; max-age=${60 * 60 * 24 * 365}`;
       return true;
     }
 
@@ -231,18 +254,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.setItem("neet_registered_users", JSON.stringify(registeredUsers));
     setUser(newUser);
     localStorage.setItem("neet_user", JSON.stringify(newUser));
+    document.cookie = `neet_user=${encodeURIComponent(JSON.stringify(newUser))}; path=/; max-age=${60 * 60 * 24 * 365}`;
     return true;
   };
 
   const logout = () => {
     setUser(null);
     localStorage.removeItem("neet_user");
+    document.cookie = "neet_user=; path=/; max-age=0";
   };
 
   const updateUser = (u: User) => {
     const migrated = migrateUser(u);
     setUser(migrated);
     localStorage.setItem("neet_user", JSON.stringify(migrated));
+    document.cookie = `neet_user=${encodeURIComponent(JSON.stringify(migrated))}; path=/; max-age=${60 * 60 * 24 * 365}`;
   };
 
   const activateSubscription = (plan: string, days: number) => {
@@ -251,6 +277,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const migrated = migrateUser(updated);
     setUser(migrated);
     localStorage.setItem("neet_user", JSON.stringify(migrated));
+    document.cookie = `neet_user=${encodeURIComponent(JSON.stringify(migrated))}; path=/; max-age=${60 * 60 * 24 * 365}`;
   };
 
   const updateProgress = (chapterId: number, isCorrect: boolean) => {

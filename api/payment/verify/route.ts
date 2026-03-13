@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifySignature } from "@/lib/payment/razorpay";
+import { PRICING, calculateSubscriptionEnd } from "@/lib/pricing-config";
 
 export async function POST(req: NextRequest) {
   try {
@@ -10,15 +11,20 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, message: "Invalid signature" }, { status: 400 });
     }
 
-    // in a real app we would update the user record in database
+    // Use centralized pricing configuration for subscription
     const now = new Date();
-    const subscriptionEnd = new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000).toISOString();
+    const subscriptionEnd = calculateSubscriptionEnd(now);
+
     const userUpdate = {
+      subscriptionPlan: PRICING.premium.id,
+      subscriptionStart: now.toISOString(),
+      subscriptionEnd: subscriptionEnd.toISOString(),
       subscription: "active",
-      plan: "NEET Test Series",
+      plan: PRICING.premium.id,
       subscription_start: now.toISOString(),
-      subscription_end: subscriptionEnd,
-      expiryDate: subscriptionEnd, // legacy field
+      subscription_end: subscriptionEnd.toISOString(),
+      expiryDate: subscriptionEnd.toISOString(), // legacy field
+      isPaid: true,
     };
     return NextResponse.json({ success: true, user: userUpdate });
   } catch (err: any) {

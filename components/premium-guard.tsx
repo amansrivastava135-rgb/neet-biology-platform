@@ -2,14 +2,23 @@
  * Premium Access Guard Component
  * Prevents non-premium users from accessing paid features
  * Automatically redirects expired users to pricing page
+ * Enforces 1-year subscription expiration checks
  */
 
 "use client";
 
-import { ReactNode } from "react";
+import { ReactNode, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
-import { isSubscriptionActive, validateAndUpdateSubscription } from "@/lib/subscription-utils";
+import { 
+  isSubscriptionActive, 
+  validateAndUpdateSubscription,
+  isSubscriptionExpiringsoon,
+  getRemainingDays,
+  formatSubscriptionExpiry 
+} from "@/lib/subscription-utils";
+import { isPremium } from "@/lib/checkPremium";
+import { AlertCircle } from "lucide-react";
 
 interface PremiumGuardProps {
   children: ReactNode;
@@ -17,10 +26,23 @@ interface PremiumGuardProps {
 }
 
 export function PremiumGuard({ children, fallback }: PremiumGuardProps) {
-  const { user } = useAuth();
+  const { user, updateUser } = useAuth();
   const router = useRouter();
+  const [validatedUser, setValidatedUser] = useState(user);
 
-  if (!user) {
+  // Validate subscription on mount and when user changes
+  useEffect(() => {
+    if (user) {
+      const validated = validateAndUpdateSubscription(user);
+      if (validated.subscription !== user.subscription || validated.isPaid !== user.isPaid) {
+        // Subscription status changed, update context
+        updateUser(validated);
+      }
+      setValidatedUser(validated);
+    }
+  }, [user, updateUser]);
+
+  if (!validatedUser) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen gap-4">
         <h2 className="text-2xl font-bold">Please log in</h2>
@@ -37,20 +59,18 @@ export function PremiumGuard({ children, fallback }: PremiumGuardProps) {
     );
   }
 
-  // Validate subscription and check if expired
-  const validatedUser = validateAndUpdateSubscription(user);
-  const isPremium = isSubscriptionActive(validatedUser);
+  const isPremiumUser = isPremium(validatedUser);
 
-  if (!isPremium) {
+  if (!isPremiumUser) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen gap-4">
-        <h2 className="text-2xl font-bold">Premium Access Required</h2>
+        <h2 className="text-2xl font-bold">Upgrade to Premium to access this feature.</h2>
         <p className="text-muted-foreground">
           This feature is only available for premium members.
         </p>
         {validatedUser.subscription === "expired" && (
           <p className="text-amber-600 font-semibold">
-            Your subscription has expired. Please renew to continue.
+            Your subscription expired on {formatSubscriptionExpiry(validatedUser)}.
           </p>
         )}
         <button
@@ -69,10 +89,8 @@ export function PremiumGuard({ children, fallback }: PremiumGuardProps) {
 /**
  * Subscription Warning Banner
  * Shows when subscription is expiring within 7 days
+ * Enforces user awareness of upcoming expiration
  */
-import { isSubscriptionExpiringsoon, getRemainingDays, formatSubscriptionExpiry } from "@/lib/subscription-utils";
-import { AlertCircle } from "lucide-react";
-
 export function SubscriptionWarningBanner() {
   const { user } = useAuth();
 
@@ -89,7 +107,7 @@ export function SubscriptionWarningBanner() {
       <div>
         <p className="font-semibold text-amber-900">Subscription Expiring Soon</p>
         <p className="text-sm text-amber-800">
-          Your subscription expires in {remainingDays} day{remainingDays !== 1 ? "s" : ""} ({expiryDate}).
+          Your 1-year subscription expires in {remainingDays} day{remainingDays !== 1 ? "s" : ""} ({expiryDate}).
           <a href="/pricing" className="underline ml-1 font-semibold hover:text-amber-700">
             Renew now
           </a>

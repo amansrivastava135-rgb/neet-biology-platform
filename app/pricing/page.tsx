@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
 import { AuthProvider, useAuth } from "@/lib/auth-context";
+import { isPremium } from "@/lib/checkPremium";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -11,6 +12,7 @@ import { Shield, Zap, BookOpen, FileText, BarChart3, Clock, Check, X } from "luc
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { PRICING, calculateSubscriptionEnd } from "@/lib/pricing-config";
+import { PricingCard } from "@/components/PricingCard";
 
 // simple feature list driven by spec
 const features = [
@@ -22,6 +24,7 @@ const features = [
 
 function PricingContent() {
   const { user, activateSubscription, updateUser } = useAuth();
+  const isPaid = isPremium(user);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
@@ -55,7 +58,7 @@ function PricingContent() {
     try {
       // if key is not configured we simulate purchase for development
       if (!process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID) {
-        activateSubscription("NEET Test Series", 365);
+        activateSubscription(PRICING.premium.id, PRICING.premium.durationDays);
         router.push("/dashboard");
         return;
       }
@@ -119,7 +122,7 @@ function PricingContent() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-background">
+    <div className="page-wrapper min-h-screen flex flex-col bg-background">
       <Header />
       <main className="flex-1">
         <div className="container mx-auto px-4 py-12">
@@ -140,96 +143,68 @@ function PricingContent() {
             <div className="mb-4 text-center text-red-600">{error}</div>
           )}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto mb-16">
-            {/* Free Plan */}
-            <Card className="border-border">
-              <CardHeader className="text-center pb-4">
-                <CardTitle className="text-2xl">Free</CardTitle>
-                <CardDescription>Try before you commit</CardDescription>
-                <div className="mt-4">
-                  <span className="text-4xl font-bold text-foreground">Rs.0</span>
-                  <span className="text-muted-foreground">/forever</span>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <ul className="space-y-3">
-                  {features.map((feature) => (
-                    <li key={feature.name} className="flex items-center gap-3">
-                      {feature.free ? (
-                        <Check className="h-5 w-5 text-primary flex-shrink-0" />
-                      ) : (
-                        <X className="h-5 w-5 text-muted-foreground flex-shrink-0" />
-                      )}
-                      <span className={feature.free ? "text-foreground" : "text-muted-foreground"}>
-                        {feature.name}
-                        {typeof feature.free === "string" && (
-                          <span className="text-muted-foreground ml-1">({feature.free})</span>
-                        )}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-                {user ? (
-                  <Button variant="outline" className="w-full" disabled>
-                    Current Plan
-                  </Button>
-                ) : (
-                  <Button variant="outline" className="w-full" asChild>
-                    <Link href="/signup">Get Started Free</Link>
-                  </Button>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Premium Plan */}
-            <Card className="border-primary shadow-lg relative">
-              <Badge className="absolute -top-3 left-1/2 -translate-x-1/2">
-                Most Popular
-              </Badge>
-              <CardHeader className="text-center pb-4">
-                <CardTitle className="text-2xl">Premium</CardTitle>
-                <CardDescription>{PRICING.premium.description}</CardDescription>
-                <div className="mt-4">
-                  <span className="text-4xl font-bold text-foreground">Rs.{PRICING.premium.price}</span>
-                  <span className="block text-sm text-muted-foreground mt-1">{PRICING.premium.label}</span>
-                </div>
-                <p className="text-sm text-muted-foreground mt-2">
-                  {PRICING.premium.displayText}
-                </p>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <ul className="space-y-3">
-                  {features.map((feature) => (
-                    <li key={feature.name} className="flex items-center gap-3">
-                      <Check className="h-5 w-5 text-primary flex-shrink-0" />
-                      <span className="text-foreground">
-                        {feature.name}
-                        {typeof feature.premium === "string" && (
-                          <span className="text-muted-foreground ml-1">({feature.premium})</span>
-                        )}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-                {user?.isPaid ? (
-                  <Button className="w-full" disabled>
-                    Already Subscribed
-                  </Button>
-                ) : user ? (
-                  <Button
-                    className="w-full"
-                    onClick={handleBuy}
-                    disabled={loading}
-                  >
-                    {loading ? "Processing..." : `Buy Now for ₹${PRICING.premium.price}`}
-                  </Button>
-                ) : (
-                  <Button className="w-full" asChild>
-                    <Link href="/signup">Get Started</Link>
-                  </Button>
-                )}
-              </CardContent>
-            </Card>
+            <PricingCard
+              plan="free"
+              features={features.map((f) => ({ name: f.name, included: f.free }))}
+              userIsPaid={isPaid}
+            />
+            <PricingCard
+              plan="premium"
+              features={features.map((f) => ({ name: f.name, included: f.premium }))}
+              userIsPaid={isPaid}
+              onBuy={handleBuy}
+            />
           </div>
+
+          {/* Premium Plan */}
+          <Card className="border-primary shadow-lg relative">
+            <Badge className="absolute -top-3 left-1/2 -translate-x-1/2">
+              Most Popular
+            </Badge>
+            <CardHeader className="text-center pb-4">
+              <CardTitle className="text-2xl">Premium</CardTitle>
+              <CardDescription>{PRICING.premium.description}</CardDescription>
+              <div className="mt-4">
+                <span className="text-4xl font-bold text-foreground">Rs.{PRICING.premium.price}</span>
+                <span className="block text-sm text-muted-foreground mt-1">{PRICING.premium.label}</span>
+              </div>
+              <p className="text-sm text-muted-foreground mt-2">
+                {PRICING.premium.displayText}
+              </p>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <ul className="space-y-3">
+                {features.map((feature) => (
+                  <li key={feature.name} className="flex items-center gap-3">
+                    <Check className="h-5 w-5 text-primary flex-shrink-0" />
+                    <span className="text-foreground">
+                      {feature.name}
+                      {typeof feature.premium === "string" && (
+                        <span className="text-muted-foreground ml-1">({feature.premium})</span>
+                      )}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+              {isPaid ? (
+                <Button className="w-full" disabled>
+                  Already Subscribed
+                </Button>
+              ) : user ? (
+                <Button
+                  className="w-full"
+                  onClick={handleBuy}
+                  disabled={loading}
+                >
+                  {loading ? "Processing..." : `Buy Now for ₹${PRICING.premium.price}`}
+                </Button>
+              ) : (
+                <Button className="w-full" asChild>
+                  <Link href="/signup">Get Started</Link>
+                </Button>
+              )}
+            </CardContent>
+          </Card>
 
           {/* Features Section */}
           <div className="mb-16">
@@ -338,7 +313,6 @@ function PricingContent() {
         </div>
       </main>
       <Footer />
-
     </div>
   );
 }

@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
 import { AuthProvider, useAuth } from "@/lib/auth-context";
+import { PremiumGuard } from "@/components/premium-guard";
+import { isPremium } from "@/lib/checkPremium";
 import { DashboardStats } from "@/components/dashboard/dashboard-stats";
 import { ProgressChart } from "@/components/dashboard/progress-chart";
 import { WeakChapters } from "@/components/dashboard/weak-chapters";
@@ -60,9 +62,9 @@ function DashboardContent() {
               Welcome back, {user.name}!
             </h1>
             <p className="text-muted-foreground mt-1">
-              {user.isPaid 
-                ? `You have premium access to all features.${user.expiryDate ? ` Expires on ${new Date(user.expiryDate).toLocaleDateString()}.` : ""}` 
-                : "Upgrade to premium for full access to all chapters and mock tests."}
+              {isPremium(user)
+                ? `You have premium access to all features.${user.subscriptionEnd ? ` Expires on ${new Date(user.subscriptionEnd).toLocaleDateString()}.` : user.subscription_end ? ` Expires on ${new Date(user.subscription_end).toLocaleDateString()}.` : ""}`
+                : "Upgrade to Premium to access this feature."}
             </p>
           </div>
 
@@ -140,7 +142,9 @@ function DashboardContent() {
 export default function DashboardPage() {
   return (
     <AuthProvider>
-      <DashboardContent />
+      <PremiumGuard>
+        <DashboardContent />
+      </PremiumGuard>
     </AuthProvider>
   );
 }

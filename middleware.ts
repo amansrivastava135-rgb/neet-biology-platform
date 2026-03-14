@@ -1,7 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { premiumGuard } from "@/middleware/premiumGuard";
 
-const protectedRoutes = ["/mock-test", "/practice", "/dashboard", "/analytics"];
+// Only protect premium-only pages (free users can access demo and preview content)
+const protectedRoutes = ["/dashboard", "/analytics"];
 
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
@@ -18,5 +19,5 @@ export function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/mock-test/:path*", "/practice/:path*", "/dashboard/:path*", "/analytics/:path*"],
+  matcher: ["/dashboard/:path*", "/analytics/:path*"],
 };

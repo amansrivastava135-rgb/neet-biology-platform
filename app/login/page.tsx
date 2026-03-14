@@ -113,15 +113,6 @@ function LoginForm() {
                 Sign up
               </Link>
             </div>
-
-            <div className="mt-4 p-4 bg-muted rounded-lg">
-              <p className="text-xs text-muted-foreground mb-2 font-medium">Demo Accounts:</p>
-              <ul className="text-xs text-muted-foreground space-y-1">
-                <li>Free: demo@example.com / demo123</li>
-                <li>Paid: paid@example.com / paid123</li>
-                <li>Admin: admin@example.com / admin123</li>
-              </ul>
-            </div>
           </CardContent>
         </Card>
 

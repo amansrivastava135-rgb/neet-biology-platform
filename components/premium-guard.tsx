@@ -22,10 +22,11 @@ import { AlertCircle } from "lucide-react";
 
 interface PremiumGuardProps {
   children: ReactNode;
+  requiresPremium?: boolean;
   fallback?: ReactNode;
 }
 
-export function PremiumGuard({ children, fallback }: PremiumGuardProps) {
+export function PremiumGuard({ children, requiresPremium = true, fallback }: PremiumGuardProps) {
   const { user, updateUser } = useAuth();
   const router = useRouter();
   const [validatedUser, setValidatedUser] = useState(user);
@@ -59,9 +60,16 @@ export function PremiumGuard({ children, fallback }: PremiumGuardProps) {
     );
   }
 
+  if (!requiresPremium) {
+    return <>{children}</>;
+  }
+
   const isPremiumUser = isPremium(validatedUser);
 
   if (!isPremiumUser) {
+    if (fallback) {
+      return <>{fallback}</>;
+    }
     return (
       <div className="flex flex-col items-center justify-center min-h-screen gap-4">
         <h2 className="text-2xl font-bold">Upgrade to Premium to access this feature.</h2>

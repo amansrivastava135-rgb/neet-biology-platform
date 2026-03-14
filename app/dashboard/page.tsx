@@ -142,7 +142,7 @@ function DashboardContent() {
 export default function DashboardPage() {
   return (
     <AuthProvider>
-      <PremiumGuard>
+      <PremiumGuard requiresPremium>
         <DashboardContent />
       </PremiumGuard>
     </AuthProvider>

@@ -151,9 +151,7 @@ function MockTestContentWrapper({ onTestStateChange }: { onTestStateChange: (inT
 export default function MockTestPageWrapper() {
   return (
     <AuthProvider>
-      <PremiumGuard>
-        <MockTestPage />
-      </PremiumGuard>
+      <MockTestPage />
     </AuthProvider>
   );
 }

@@ -8,18 +8,21 @@ import { isPremium } from "@/lib/checkPremium";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Shield, Zap, BookOpen, FileText, BarChart3, Clock, Check, X } from "lucide-react";
+import { Shield, Zap, BookOpen, FileText, BarChart3, Clock, Check } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { PRICING, calculateSubscriptionEnd } from "@/lib/pricing-config";
+import { PRICING } from "@/lib/pricing-config";
 import { PricingCard } from "@/components/PricingCard";
 
-// simple feature list driven by spec
 const features = [
-  { name: "50 Mock Tests", free: false, premium: true },
-  { name: "Chapter Tests", free: false, premium: true },
+  { name: "10 Demo Questions", free: true, premium: true },
+  { name: "Mock Test Preview", free: true, premium: true },
+  { name: "All 38 Chapters", free: false, premium: true },
+  { name: "3800+ MCQs", free: false, premium: true },
+  { name: "NEET PYQs (2010-2024)", free: false, premium: true },
+  { name: "Unlimited Mock Tests", free: false, premium: true },
   { name: "Performance Analytics", free: false, premium: true },
-  { name: "Dashboard Tracking", free: false, premium: true },
+  { name: "Weak Chapter Analysis", free: false, premium: true },
 ];
 
 function PricingContent() {
@@ -29,7 +32,6 @@ function PricingContent() {
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
 
-  // load razorpay script dynamically
   const loadRazorpay = () => {
     return new Promise<void>((resolve, reject) => {
       if (typeof window === "undefined") {
@@ -55,11 +57,10 @@ function PricingContent() {
     }
     setError(null);
     setLoading(true);
-    try {
-      // if key is not configured we simulate purchase for development
+     try {
       if (!process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID) {
-        activateSubscription(PRICING.premium.id, PRICING.premium.durationDays);
-        router.push("/dashboard");
+        setError("Payment system is being set up. Please contact us at +91 9004811546 to subscribe.");
+        setLoading(false);
         return;
       }
 
@@ -88,7 +89,6 @@ function PricingContent() {
 
           if (verifyRes.success) {
             if (verifyRes.user) {
-              // merge returned subscription info
               const updatedUser = {
                 ...user,
                 ...verifyRes.user,
@@ -96,7 +96,6 @@ function PricingContent() {
               };
               updateUser(updatedUser);
             }
-            // ensure activation in case API didn't send details
             activateSubscription("NEET Test Series", PRICING.premium.durationDays);
             router.push("/dashboard");
           } else {
@@ -133,7 +132,7 @@ function PricingContent() {
               Simple, Transparent Pricing
             </h1>
             <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-              Get unlimited access to all NEET Biology preparation resources for less than 
+              Get unlimited access to all NEET Biology preparation resources for less than
               the cost of a single coaching class.
             </p>
           </div>
@@ -156,8 +155,8 @@ function PricingContent() {
             />
           </div>
 
-          {/* Premium Plan */}
-          <Card className="border-primary shadow-lg relative">
+          {/* Premium Plan Details */}
+          <Card className="border-primary shadow-lg relative mb-16">
             <Badge className="absolute -top-3 left-1/2 -translate-x-1/2">
               Most Popular
             </Badge>
@@ -165,7 +164,7 @@ function PricingContent() {
               <CardTitle className="text-2xl">Premium</CardTitle>
               <CardDescription>{PRICING.premium.description}</CardDescription>
               <div className="mt-4">
-                <span className="text-4xl font-bold text-foreground">Rs.{PRICING.premium.price}</span>
+                <span className="text-4xl font-bold text-foreground">₹{PRICING.premium.price}</span>
                 <span className="block text-sm text-muted-foreground mt-1">{PRICING.premium.label}</span>
               </div>
               <p className="text-sm text-muted-foreground mt-2">
@@ -174,15 +173,10 @@ function PricingContent() {
             </CardHeader>
             <CardContent className="space-y-6">
               <ul className="space-y-3">
-                {features.map((feature) => (
+                {features.filter(f => f.premium).map((feature) => (
                   <li key={feature.name} className="flex items-center gap-3">
                     <Check className="h-5 w-5 text-primary flex-shrink-0" />
-                    <span className="text-foreground">
-                      {feature.name}
-                      {typeof feature.premium === "string" && (
-                        <span className="text-muted-foreground ml-1">({feature.premium})</span>
-                      )}
-                    </span>
+                    <span className="text-foreground">{feature.name}</span>
                   </li>
                 ))}
               </ul>
@@ -191,11 +185,7 @@ function PricingContent() {
                   Already Subscribed
                 </Button>
               ) : user ? (
-                <Button
-                  className="w-full"
-                  onClick={handleBuy}
-                  disabled={loading}
-                >
+                <Button className="w-full" onClick={handleBuy} disabled={loading}>
                   {loading ? "Processing..." : `Buy Now for ₹${PRICING.premium.price}`}
                 </Button>
               ) : (
@@ -281,7 +271,7 @@ function PricingContent() {
                     Can I cancel my subscription anytime?
                   </h3>
                   <p className="text-sm text-muted-foreground">
-                    Yes, you can cancel your subscription at any time. Your access will continue 
+                    Yes, you can cancel your subscription at any time. Your access will continue
                     until the end of your billing period.
                   </p>
                 </CardContent>
@@ -292,7 +282,7 @@ function PricingContent() {
                     Is the content based on NCERT?
                   </h3>
                   <p className="text-sm text-muted-foreground">
-                    Yes, all questions and explanations are strictly based on NCERT Biology 
+                    Yes, all questions and explanations are strictly based on NCERT Biology
                     textbooks and NEET exam patterns.
                   </p>
                 </CardContent>
@@ -303,7 +293,7 @@ function PricingContent() {
                     What payment methods are accepted?
                   </h3>
                   <p className="text-sm text-muted-foreground">
-                    We accept UPI, debit cards, credit cards, and net banking through our 
+                    We accept UPI, debit cards, credit cards, and net banking through our
                     secure payment gateway.
                   </p>
                 </CardContent>

@@ -45,8 +45,8 @@ export const metadata: Metadata = {
       follow: true,
     },
   },
-  verification: {
-    google: 'add-your-google-search-console-verification-code-here',
+verification: {
+    google: '8wjsGDVb9cj7iZPsFWXiZMmoWln2hjb7bbE5R8piAfk',
   },
 }
 

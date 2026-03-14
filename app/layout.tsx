@@ -15,9 +15,39 @@ const merriweather = Merriweather({
 });
 
 export const metadata: Metadata = {
-  title: 'Dr. Amankumar Srivastav Pvt Tutorials | NEET Biology Preparation',
-  description: 'Master NCERT Biology for NEET with chapter-wise practice, previous year questions, mock tests, and performance analytics. Expert guidance by Dr. Amankumar Srivastav.',
-  keywords: ['NEET Biology', 'NCERT Biology', 'NEET Preparation', 'Biology MCQ', 'NEET PYQ', 'Medical Entrance'],
+  title: {
+    default: 'Dr. Amankumar Srivastav | NEET Biology Preparation',
+    template: '%s | NEET Biology by Dr. Amankumar Srivastav',
+  },
+  description: 'Master NCERT Biology for NEET with 3800+ MCQs, chapter-wise practice, PYQs (2010-2024), mock tests, and performance analytics. Expert guidance by Dr. Amankumar Srivastav.',
+  keywords: ['NEET Biology', 'NCERT Biology', 'NEET Preparation', 'Biology MCQ', 'NEET PYQ', 'Medical Entrance', 'NEET 2025', 'NEET 2026', 'Biology Mock Test', 'NCERT MCQ'],
+  authors: [{ name: 'Dr. Amankumar Srivastav' }],
+  creator: 'Dr. Amankumar Srivastav',
+  metadataBase: new URL('https://neet-biology-platform.vercel.app'),
+  openGraph: {
+    type: 'website',
+    locale: 'en_IN',
+    url: 'https://neet-biology-platform.vercel.app',
+    siteName: 'Dr. Amankumar Srivastav Pvt Tutorials',
+    title: 'NEET Biology Preparation | 3800+ MCQs & Mock Tests',
+    description: 'Master NCERT Biology for NEET with chapter-wise practice, PYQs, mock tests, and analytics.',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'NEET Biology Preparation | Dr. Amankumar Srivastav',
+    description: 'Master NCERT Biology for NEET with 3800+ MCQs, mock tests, and analytics.',
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+    },
+  },
+  verification: {
+    google: 'add-your-google-search-console-verification-code-here',
+  },
 }
 
 export default function RootLayout({

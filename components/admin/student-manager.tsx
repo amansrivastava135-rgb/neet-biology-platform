@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,37 +20,62 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Search, Users, Crown, UserCircle } from "lucide-react";
+import { Search, Users, Crown, UserCircle, RefreshCw } from "lucide-react";
+import { type User } from "@/lib/auth-context";
 
-// Mock student data
-const mockStudents = [
-  { id: 1, name: "Rahul Kumar", email: "rahul@example.com", isPaid: true, questionsAttempted: 450, accuracy: 78, joinedAt: "2024-01-15" },
-  { id: 2, name: "Priya Singh", email: "priya@example.com", isPaid: true, questionsAttempted: 380, accuracy: 82, joinedAt: "2024-01-20" },
-  { id: 3, name: "Amit Sharma", email: "amit@example.com", isPaid: false, questionsAttempted: 120, accuracy: 65, joinedAt: "2024-02-01" },
-  { id: 4, name: "Neha Gupta", email: "neha@example.com", isPaid: true, questionsAttempted: 520, accuracy: 85, joinedAt: "2024-02-10" },
-  { id: 5, name: "Vikram Patel", email: "vikram@example.com", isPaid: false, questionsAttempted: 80, accuracy: 60, joinedAt: "2024-02-15" },
-  { id: 6, name: "Anjali Verma", email: "anjali@example.com", isPaid: true, questionsAttempted: 310, accuracy: 75, joinedAt: "2024-02-20" },
-  { id: 7, name: "Rohit Jain", email: "rohit@example.com", isPaid: false, questionsAttempted: 50, accuracy: 70, joinedAt: "2024-03-01" },
-  { id: 8, name: "Sneha Reddy", email: "sneha@example.com", isPaid: true, questionsAttempted: 420, accuracy: 88, joinedAt: "2024-03-05" },
-];
+type StudentData = {
+  id: string;
+  name: string;
+  email: string;
+  isPaid: boolean;
+  joinedAt: string;
+  subscriptionEnd?: string;
+};
 
 export function StudentManager() {
+  const [students, setStudents] = useState<StudentData[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
 
-  const filteredStudents = mockStudents.filter((student) => {
-    const matchesSearch = 
+  // Real data from localStorage
+  const loadStudents = () => {
+    const registeredUsers = JSON.parse(
+      localStorage.getItem("neet_registered_users") || "{}"
+    );
+
+    const studentList: StudentData[] = Object.values(registeredUsers).map(
+      (entry: any) => ({
+        id: entry.user.id,
+        name: entry.user.name,
+        email: entry.user.email,
+        isPaid: entry.user.isPaid || false,
+        joinedAt: entry.user.id
+          ? new Date(parseInt(entry.user.id)).toLocaleDateString()
+          : "N/A",
+        subscriptionEnd: entry.user.subscriptionEnd,
+      })
+    );
+
+    setStudents(studentList);
+  };
+
+  useEffect(() => {
+    loadStudents();
+  }, []);
+
+  const filteredStudents = students.filter((student) => {
+    const matchesSearch =
       student.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       student.email.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesStatus = 
+    const matchesStatus =
       filterStatus === "all" ||
       (filterStatus === "paid" && student.isPaid) ||
       (filterStatus === "free" && !student.isPaid);
     return matchesSearch && matchesStatus;
   });
 
-  const paidCount = mockStudents.filter(s => s.isPaid).length;
-  const freeCount = mockStudents.filter(s => !s.isPaid).length;
+  const paidCount = students.filter((s) => s.isPaid).length;
+  const freeCount = students.filter((s) => !s.isPaid).length;
 
   return (
     <div className="space-y-6">
@@ -63,7 +88,9 @@ export function StudentManager() {
                 <Users className="h-5 w-5 text-blue-500" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-foreground">{mockStudents.length}</p>
+                <p className="text-2xl font-bold text-foreground">
+                  {students.length}
+                </p>
                 <p className="text-sm text-muted-foreground">Total Students</p>
               </div>
             </div>
@@ -118,6 +145,10 @@ export function StudentManager() {
             <SelectItem value="free">Free Only</SelectItem>
           </SelectContent>
         </Select>
+        <Button variant="outline" onClick={loadStudents} className="gap-2">
+          <RefreshCw className="h-4 w-4" />
+          Refresh
+        </Button>
       </div>
 
       {/* Students Table */}
@@ -128,48 +159,57 @@ export function StudentManager() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Questions</TableHead>
-                  <TableHead className="text-right">Accuracy</TableHead>
-                  <TableHead className="text-right">Joined</TableHead>
-                  <TableHead></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredStudents.map((student) => (
-                  <TableRow key={student.id}>
-                    <TableCell className="font-medium">{student.name}</TableCell>
-                    <TableCell className="text-muted-foreground">{student.email}</TableCell>
-                    <TableCell>
-                      <Badge variant={student.isPaid ? "default" : "secondary"}>
-                        {student.isPaid ? "Premium" : "Free"}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">{student.questionsAttempted}</TableCell>
-                    <TableCell className="text-right">
-                      <span className={student.accuracy >= 70 ? "text-green-600" : "text-amber-600"}>
-                        {student.accuracy}%
-                      </span>
-                    </TableCell>
-                    <TableCell className="text-right text-muted-foreground">
-                      {new Date(student.joinedAt).toLocaleDateString()}
-                    </TableCell>
-                    <TableCell>
-                      <Button variant="ghost" size="sm">
-                        View
-                      </Button>
-                    </TableCell>
+          {students.length === 0 ? (
+            <div className="text-center py-12">
+              <Users className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+              <p className="text-muted-foreground">
+                No students registered yet.
+              </p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Email</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Joined</TableHead>
+                    <TableHead>Expires</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+                </TableHeader>
+                <TableBody>
+                  {filteredStudents.map((student) => (
+                    <TableRow key={student.id}>
+                      <TableCell className="font-medium">
+                        {student.name}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {student.email}
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          variant={student.isPaid ? "default" : "secondary"}
+                        >
+                          {student.isPaid ? "Premium" : "Free"}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {student.joinedAt}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {student.subscriptionEnd
+                          ? new Date(
+                              student.subscriptionEnd
+                            ).toLocaleDateString()
+                          : "—"}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

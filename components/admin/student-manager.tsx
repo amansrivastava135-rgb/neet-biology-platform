@@ -21,7 +21,6 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Search, Users, Crown, UserCircle, RefreshCw } from "lucide-react";
-import { type User } from "@/lib/auth-context";
 
 type StudentData = {
   id: string;
@@ -37,12 +36,10 @@ export function StudentManager() {
   const [searchQuery, setSearchQuery] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
 
-  // Real data from localStorage
   const loadStudents = () => {
     const registeredUsers = JSON.parse(
       localStorage.getItem("neet_registered_users") || "{}"
     );
-
     const studentList: StudentData[] = Object.values(registeredUsers).map(
       (entry: any) => ({
         id: entry.user.id,
@@ -55,13 +52,52 @@ export function StudentManager() {
         subscriptionEnd: entry.user.subscriptionEnd,
       })
     );
-
     setStudents(studentList);
   };
 
   useEffect(() => {
     loadStudents();
   }, []);
+
+  const handleGivePremium = (email: string) => {
+    const registeredUsers = JSON.parse(
+      localStorage.getItem("neet_registered_users") || "{}"
+    );
+    if (registeredUsers[email]) {
+      const now = new Date();
+      const expiry = new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000);
+      registeredUsers[email].user = {
+        ...registeredUsers[email].user,
+        isPaid: true,
+        subscriptionPlan: "premium",
+        subscription: "active",
+        subscriptionStart: now.toISOString(),
+        subscriptionEnd: expiry.toISOString(),
+        plan: "premium",
+      };
+      localStorage.setItem("neet_registered_users", JSON.stringify(registeredUsers));
+      loadStudents();
+      alert(`✅ Premium activated for ${email}!`);
+    }
+  };
+
+  const handleRevokePremium = (email: string) => {
+    const registeredUsers = JSON.parse(
+      localStorage.getItem("neet_registered_users") || "{}"
+    );
+    if (registeredUsers[email]) {
+      registeredUsers[email].user = {
+        ...registeredUsers[email].user,
+        isPaid: false,
+        subscriptionPlan: "free",
+        subscription: "free",
+        subscriptionEnd: undefined,
+      };
+      localStorage.setItem("neet_registered_users", JSON.stringify(registeredUsers));
+      loadStudents();
+      alert(`❌ Premium revoked for ${email}!`);
+    }
+  };
 
   const filteredStudents = students.filter((student) => {
     const matchesSearch =
@@ -79,7 +115,6 @@ export function StudentManager() {
 
   return (
     <div className="space-y-6">
-      {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card className="border-border">
           <CardContent className="pt-6">
@@ -88,9 +123,7 @@ export function StudentManager() {
                 <Users className="h-5 w-5 text-blue-500" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-foreground">
-                  {students.length}
-                </p>
+                <p className="text-2xl font-bold text-foreground">{students.length}</p>
                 <p className="text-sm text-muted-foreground">Total Students</p>
               </div>
             </div>
@@ -124,7 +157,6 @@ export function StudentManager() {
         </Card>
       </div>
 
-      {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-4">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -151,7 +183,6 @@ export function StudentManager() {
         </Button>
       </div>
 
-      {/* Students Table */}
       <Card className="border-border">
         <CardHeader>
           <CardTitle className="text-lg">
@@ -162,9 +193,7 @@ export function StudentManager() {
           {students.length === 0 ? (
             <div className="text-center py-12">
               <Users className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-              <p className="text-muted-foreground">
-                No students registered yet.
-              </p>
+              <p className="text-muted-foreground">No students registered yet.</p>
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -176,33 +205,45 @@ export function StudentManager() {
                     <TableHead>Status</TableHead>
                     <TableHead>Joined</TableHead>
                     <TableHead>Expires</TableHead>
+                    <TableHead>Action</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filteredStudents.map((student) => (
                     <TableRow key={student.id}>
-                      <TableCell className="font-medium">
-                        {student.name}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {student.email}
-                      </TableCell>
+                      <TableCell className="font-medium">{student.name}</TableCell>
+                      <TableCell className="text-muted-foreground">{student.email}</TableCell>
                       <TableCell>
-                        <Badge
-                          variant={student.isPaid ? "default" : "secondary"}
-                        >
+                        <Badge variant={student.isPaid ? "default" : "secondary"}>
                           {student.isPaid ? "Premium" : "Free"}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {student.joinedAt}
-                      </TableCell>
+                      <TableCell className="text-muted-foreground">{student.joinedAt}</TableCell>
                       <TableCell className="text-muted-foreground">
                         {student.subscriptionEnd
-                          ? new Date(
-                              student.subscriptionEnd
-                            ).toLocaleDateString()
+                          ? new Date(student.subscriptionEnd).toLocaleDateString()
                           : "—"}
+                      </TableCell>
+                      <TableCell>
+                        {student.isPaid ? (
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            onClick={() => handleRevokePremium(student.email)}
+                          >
+                            Revoke
+                          </Button>
+                        ) : (
+                          <Button
+                            variant="default"
+                            size="sm"
+                            onClick={() => handleGivePremium(student.email)}
+                            className="gap-1"
+                          >
+                            <Crown className="h-3 w-3" />
+                            Give Premium
+                          </Button>
+                        )}
                       </TableCell>
                     </TableRow>
                   ))}

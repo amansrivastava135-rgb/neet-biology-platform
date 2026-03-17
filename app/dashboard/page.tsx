@@ -14,19 +14,44 @@ import { QuickActions } from "@/components/dashboard/quick-actions";
 import { RecentActivity } from "@/components/dashboard/recent-activity";
 import { ProgressCards } from "@/components/dashboard/progress-cards";
 import { getResults, summarize, TestResult } from "@/lib/analytics";
+import { type UserProgress } from "@/lib/auth-context";
 import { Loader2 } from "lucide-react";
 
 function DashboardContent() {
-  const { user, isLoading, progress } = useAuth();
+  const { user, isLoading } = useAuth();
   const router = useRouter();
-
   const [results, setResults] = useState<TestResult[]>([]);
+  const [progress, setProgress] = useState<UserProgress>({
+    totalAttempted: 0,
+    totalCorrect: 0,
+    chapterProgress: {},
+  });
 
   useEffect(() => {
     if (typeof window !== "undefined") {
       setResults(getResults());
     }
   }, []);
+
+  // Load progress directly from localStorage per user
+  useEffect(() => {
+    if (user) {
+      try {
+        const progressKey = `neet_progress_${user.id}`;
+        // Try per-user key first, fallback to old key
+        const stored = localStorage.getItem(progressKey) || localStorage.getItem("neet_progress");
+        if (stored) {
+          setProgress(JSON.parse(stored));
+          // Migrate to per-user key
+          localStorage.setItem(progressKey, stored);
+        } else {
+          setProgress({ totalAttempted: 0, totalCorrect: 0, chapterProgress: {} });
+        }
+      } catch {
+        // ignore
+      }
+    }
+  }, [user]);
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -42,9 +67,7 @@ function DashboardContent() {
     );
   }
 
-  if (!user) {
-    return null;
-  }
+  if (!user) return null;
 
   const { totalTests, avgAccuracy, bestScore, topicStats } = summarize(results);
   const strongTopics = [...topicStats].sort((a, b) => b.accuracy - a.accuracy).slice(0, 5);
@@ -56,30 +79,25 @@ function DashboardContent() {
       <Header />
       <main className="flex-1">
         <div className="container mx-auto px-4 py-8">
-          {/* Welcome Header */}
           <div className="mb-8">
             <h1 className="text-3xl font-bold text-foreground">
               Welcome back, {user.name}!
             </h1>
             <p className="text-muted-foreground mt-1">
               {isPremium(user)
-                ? `You have premium access to all features.${user.subscriptionEnd ? ` Expires on ${new Date(user.subscriptionEnd).toLocaleDateString()}.` : user.subscription_end ? ` Expires on ${new Date(user.subscription_end).toLocaleDateString()}.` : ""}`
+                ? `You have premium access to all features.${user.subscriptionEnd ? ` Expires on ${new Date(user.subscriptionEnd).toLocaleDateString()}.` : ""}`
                 : "Upgrade to Premium to access this feature."}
             </p>
           </div>
 
-          {/* Quick Actions */}
           <QuickActions isPaid={user.isPaid} />
 
-          {/* Stats Overview */}
           <DashboardStats progress={progress} />
 
-          {/* Performance Summary Cards (from mock test history) */}
           <div className="mt-6">
             <ProgressCards results={results} />
           </div>
 
-          {/* Topic Analysis */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
             <div>
               <h2 className="text-lg font-medium text-foreground mb-2">Strong Topics</h2>
@@ -99,7 +117,6 @@ function DashboardContent() {
             </div>
           </div>
 
-          {/* Recent Test History */}
           <div className="mt-6">
             <h2 className="text-lg font-medium text-foreground mb-2">Recent Tests</h2>
             <table className="w-full text-sm">
@@ -122,13 +139,11 @@ function DashboardContent() {
             </table>
           </div>
 
-          {/* Charts and Insights */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
             <ProgressChart progress={progress} />
             <WeakChapters progress={progress} />
           </div>
 
-          {/* Recent Activity */}
           <div className="mt-6">
             <RecentActivity progress={progress} />
           </div>

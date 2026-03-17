@@ -40,7 +40,13 @@ function SignupForm() {
     try {
       const success = await signup(email, password, name);
       if (success) {
-        router.push("/dashboard");
+        const storedUser = localStorage.getItem("neet_user");
+        if (storedUser) {
+          const user = JSON.parse(storedUser);
+          router.push(user.isAdmin ? "/admin" : "/dashboard");
+        } else {
+          router.push("/dashboard");
+        }
       } else {
         setError("Email already registered. Please use a different email.");
       }

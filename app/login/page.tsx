@@ -27,7 +27,18 @@ function LoginForm() {
     try {
       const success = await login(email, password);
       if (success) {
-        router.push("/dashboard");
+        // Admin ko /admin pe, baaki ko /dashboard pe bhejo
+        const storedUser = localStorage.getItem("neet_user");
+        if (storedUser) {
+          const user = JSON.parse(storedUser);
+          if (user.isAdmin) {
+            router.push("/admin");
+          } else {
+            router.push("/dashboard");
+          }
+        } else {
+          router.push("/dashboard");
+        }
       } else {
         setError("Invalid email or password. Please try again.");
       }

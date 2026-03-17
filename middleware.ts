@@ -1,13 +1,40 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { premiumGuard } from "@/middleware/premiumGuard";
 
-// Only protect premium-only pages (free users can access demo and preview content)
-const protectedRoutes = ["/dashboard", "/analytics"];
+const premiumRoutes = ["/dashboard", "/analytics"];
+const adminRoutes = ["/admin"];
 
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
-  if (protectedRoutes.some((route) => pathname.startsWith(route))) {
+  // Admin route protection
+  if (adminRoutes.some((route) => pathname.startsWith(route))) {
+    const userCookie = req.cookies.get("neet_user");
+
+    if (!userCookie) {
+      const redirectUrl = req.nextUrl.clone();
+      redirectUrl.pathname = "/login";
+      return NextResponse.redirect(redirectUrl);
+    }
+
+    try {
+      const user = JSON.parse(decodeURIComponent(userCookie.value));
+      if (!user.isAdmin) {
+        const redirectUrl = req.nextUrl.clone();
+        redirectUrl.pathname = "/dashboard";
+        return NextResponse.redirect(redirectUrl);
+      }
+      // Admin valid — seedha jaane do
+      return NextResponse.next();
+    } catch {
+      const redirectUrl = req.nextUrl.clone();
+      redirectUrl.pathname = "/login";
+      return NextResponse.redirect(redirectUrl);
+    }
+  }
+
+  // Premium route protection
+  if (premiumRoutes.some((route) => pathname.startsWith(route))) {
     if (!premiumGuard(req)) {
       const redirectUrl = req.nextUrl.clone();
       redirectUrl.pathname = "/pricing";
@@ -19,5 +46,5 @@ export function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/dashboard/:path*", "/analytics/:path*"],
+  matcher: ["/dashboard/:path*", "/analytics/:path*", "/admin/:path*"],
 };

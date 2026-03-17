@@ -137,6 +137,9 @@ const DEMO_USERS: Record<string, { password: string; user: User }> = {
       isAdmin: false,
       subscribedAt: new Date(),
       expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+      subscriptionPlan: "premium" as const,
+      subscription: "active" as const,
+      subscriptionEnd: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
     },
   },
   "admin@example.com": {
@@ -147,10 +150,12 @@ const DEMO_USERS: Record<string, { password: string; user: User }> = {
       name: "Admin",
       isPaid: true,
       isAdmin: true,
+      subscriptionPlan: "premium" as const,
+      subscription: "active" as const,
+      subscriptionEnd: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
     },
   },
 };
-
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [progress, setProgress] = useState<UserProgress>({

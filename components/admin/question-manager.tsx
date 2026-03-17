@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,11 +23,30 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { sampleQuestions, class11Chapters, class12Chapters, type Question } from "@/lib/data";
-import { Plus, Search, Edit, Trash2 } from "lucide-react";
+import { class11Chapters, class12Chapters, type Question } from "@/lib/data";
+import { Plus, Search, Trash2 } from "lucide-react";
+
+const STORAGE_KEY = "neet_admin_questions";
+
+function loadFromStorage(): Question[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const stored = window.localStorage.getItem(STORAGE_KEY);
+    return stored ? JSON.parse(stored) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveToStorage(questions: Question[]) {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(questions));
+  } catch {}
+}
 
 export function QuestionManager() {
-  const [questions, setQuestions] = useState<Question[]>(sampleQuestions);
+  const [questions, setQuestions] = useState<Question[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterChapter, setFilterChapter] = useState("all");
   const [filterSource, setFilterSource] = useState("all");
@@ -46,6 +65,10 @@ export function QuestionManager() {
 
   const allChapters = [...class11Chapters, ...class12Chapters];
 
+  useEffect(() => {
+    setQuestions(loadFromStorage());
+  }, []);
+
   const filteredQuestions = questions.filter((q) => {
     const matchesSearch = q.question.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesChapter = filterChapter === "all" || q.chapterId.toString() === filterChapter;
@@ -54,9 +77,9 @@ export function QuestionManager() {
   });
 
   const handleAddQuestion = () => {
-    const chapter = allChapters.find(c => c.id === newQuestion.chapterId);
+    const chapter = allChapters.find((c) => c.id === newQuestion.chapterId);
     const newQ: Question = {
-      id: questions.length + 1,
+      id: Date.now(),
       question: newQuestion.question,
       options: {
         A: newQuestion.optionA,
@@ -70,7 +93,9 @@ export function QuestionManager() {
       chapterName: chapter?.name || "",
       source: newQuestion.source,
     };
-    setQuestions([newQ, ...questions]);
+    const updated = [newQ, ...questions];
+    setQuestions(updated);
+    saveToStorage(updated);
     setIsAddDialogOpen(false);
     setNewQuestion({
       question: "",
@@ -86,12 +111,13 @@ export function QuestionManager() {
   };
 
   const handleDeleteQuestion = (id: number) => {
-    setQuestions(questions.filter(q => q.id !== id));
+    const updated = questions.filter((q) => q.id !== id);
+    setQuestions(updated);
+    saveToStorage(updated);
   };
 
   return (
     <div className="space-y-6">
-      {/* Actions Bar */}
       <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
         <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
           <div className="relative">
@@ -148,7 +174,9 @@ export function QuestionManager() {
                   id="question"
                   placeholder="Enter the question..."
                   value={newQuestion.question}
-                  onChange={(e) => setNewQuestion({ ...newQuestion, question: e.target.value })}
+                  onChange={(e) =>
+                    setNewQuestion({ ...newQuestion, question: e.target.value })
+                  }
                 />
               </div>
               <div className="grid grid-cols-2 gap-4">
@@ -157,7 +185,9 @@ export function QuestionManager() {
                   <Input
                     id="optionA"
                     value={newQuestion.optionA}
-                    onChange={(e) => setNewQuestion({ ...newQuestion, optionA: e.target.value })}
+                    onChange={(e) =>
+                      setNewQuestion({ ...newQuestion, optionA: e.target.value })
+                    }
                   />
                 </div>
                 <div className="space-y-2">
@@ -165,7 +195,9 @@ export function QuestionManager() {
                   <Input
                     id="optionB"
                     value={newQuestion.optionB}
-                    onChange={(e) => setNewQuestion({ ...newQuestion, optionB: e.target.value })}
+                    onChange={(e) =>
+                      setNewQuestion({ ...newQuestion, optionB: e.target.value })
+                    }
                   />
                 </div>
                 <div className="space-y-2">
@@ -173,7 +205,9 @@ export function QuestionManager() {
                   <Input
                     id="optionC"
                     value={newQuestion.optionC}
-                    onChange={(e) => setNewQuestion({ ...newQuestion, optionC: e.target.value })}
+                    onChange={(e) =>
+                      setNewQuestion({ ...newQuestion, optionC: e.target.value })
+                    }
                   />
                 </div>
                 <div className="space-y-2">
@@ -181,7 +215,9 @@ export function QuestionManager() {
                   <Input
                     id="optionD"
                     value={newQuestion.optionD}
-                    onChange={(e) => setNewQuestion({ ...newQuestion, optionD: e.target.value })}
+                    onChange={(e) =>
+                      setNewQuestion({ ...newQuestion, optionD: e.target.value })
+                    }
                   />
                 </div>
               </div>
@@ -190,7 +226,12 @@ export function QuestionManager() {
                   <Label>Correct Answer</Label>
                   <Select
                     value={newQuestion.correctAnswer}
-                    onValueChange={(v) => setNewQuestion({ ...newQuestion, correctAnswer: v as "A" | "B" | "C" | "D" })}
+                    onValueChange={(v) =>
+                      setNewQuestion({
+                        ...newQuestion,
+                        correctAnswer: v as "A" | "B" | "C" | "D",
+                      })
+                    }
                   >
                     <SelectTrigger>
                       <SelectValue />
@@ -207,14 +248,22 @@ export function QuestionManager() {
                   <Label>Chapter</Label>
                   <Select
                     value={newQuestion.chapterId.toString()}
-                    onValueChange={(v) => setNewQuestion({ ...newQuestion, chapterId: parseInt(v) })}
+                    onValueChange={(v) =>
+                      setNewQuestion({
+                        ...newQuestion,
+                        chapterId: parseInt(v),
+                      })
+                    }
                   >
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
                       {allChapters.map((chapter) => (
-                        <SelectItem key={chapter.id} value={chapter.id.toString()}>
+                        <SelectItem
+                          key={chapter.id}
+                          value={chapter.id.toString()}
+                        >
                           {chapter.name}
                         </SelectItem>
                       ))}
@@ -225,7 +274,12 @@ export function QuestionManager() {
                   <Label>Source</Label>
                   <Select
                     value={newQuestion.source}
-                    onValueChange={(v) => setNewQuestion({ ...newQuestion, source: v as "PYQ" | "NCERT" })}
+                    onValueChange={(v) =>
+                      setNewQuestion({
+                        ...newQuestion,
+                        source: v as "PYQ" | "NCERT",
+                      })
+                    }
                   >
                     <SelectTrigger>
                       <SelectValue />
@@ -243,7 +297,12 @@ export function QuestionManager() {
                   id="explanation"
                   placeholder="Enter detailed explanation referencing NCERT concepts..."
                   value={newQuestion.explanation}
-                  onChange={(e) => setNewQuestion({ ...newQuestion, explanation: e.target.value })}
+                  onChange={(e) =>
+                    setNewQuestion({
+                      ...newQuestion,
+                      explanation: e.target.value,
+                    })
+                  }
                   rows={4}
                 />
               </div>
@@ -258,7 +317,6 @@ export function QuestionManager() {
         </Dialog>
       </div>
 
-      {/* Questions List */}
       <Card className="border-border">
         <CardHeader>
           <CardTitle className="text-lg">
@@ -266,31 +324,31 @@ export function QuestionManager() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="space-y-4">
-            {filteredQuestions.slice(0, 20).map((question) => (
-              <div
-                key={question.id}
-                className="p-4 border border-border rounded-lg"
-              >
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex-1">
-                    <p className="font-medium text-foreground mb-2">
-                      {question.question}
-                    </p>
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <Badge variant="secondary">{question.chapterName}</Badge>
-                      <Badge variant={question.source === "PYQ" ? "default" : "outline"}>
-                        {question.source}
-                      </Badge>
-                      <span className="text-sm text-muted-foreground">
-                        Correct: {question.correctAnswer}
-                      </span>
+          {questions.length === 0 ? (
+            <div className="text-center py-12">
+              <p className="text-muted-foreground">
+                No questions added yet. Click "Add Question" to get started!
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {filteredQuestions.slice(0, 20).map((question) => (
+                <div key={question.id} className="p-4 border border-border rounded-lg">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1">
+                      <p className="font-medium text-foreground mb-2">
+                        {question.question}
+                      </p>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <Badge variant="secondary">{question.chapterName}</Badge>
+                        <Badge variant={question.source === "PYQ" ? "default" : "outline"}>
+                          {question.source}
+                        </Badge>
+                        <span className="text-sm text-muted-foreground">
+                          Correct: {question.correctAnswer}
+                        </span>
+                      </div>
                     </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Button variant="ghost" size="icon">
-                      <Edit className="h-4 w-4" />
-                    </Button>
                     <Button
                       variant="ghost"
                       size="icon"
@@ -300,9 +358,9 @@ export function QuestionManager() {
                     </Button>
                   </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

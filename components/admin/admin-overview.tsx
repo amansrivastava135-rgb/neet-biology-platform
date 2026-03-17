@@ -1,63 +1,87 @@
-"use client";
+ "use client";
 
+import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Users, FileQuestion, BookOpen, CreditCard, TrendingUp, IndianRupee } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
+import { class11Chapters, class12Chapters } from "@/lib/data";
 
-// Mock data for demonstration
-const stats = [
-  {
-    title: "Total Students",
-    value: "1,234",
-    change: "+12%",
-    icon: Users,
-    color: "text-blue-500",
-    bgColor: "bg-blue-500/10",
-  },
-  {
-    title: "Total Questions",
-    value: "3,800",
-    change: "+5%",
-    icon: FileQuestion,
-    color: "text-green-500",
-    bgColor: "bg-green-500/10",
-  },
-  {
-    title: "Active Chapters",
-    value: "38",
-    change: "0%",
-    icon: BookOpen,
-    color: "text-purple-500",
-    bgColor: "bg-purple-500/10",
-  },
-  {
-    title: "Monthly Revenue",
-    value: "₹48,510",
-    change: "+18%",
-    icon: IndianRupee,
-    color: "text-amber-500",
-    bgColor: "bg-amber-500/10",
-  },
-];
-
-const revenueData = [
-  { month: "Jan", revenue: 32000 },
-  { month: "Feb", revenue: 35000 },
-  { month: "Mar", revenue: 38000 },
-  { month: "Apr", revenue: 42000 },
-  { month: "May", revenue: 45000 },
-  { month: "Jun", revenue: 48510 },
-];
-
-const recentSubscriptions = [
-  { name: "Rahul Kumar", email: "rahul@example.com", plan: "Premium", date: "2 hours ago" },
-  { name: "Priya Singh", email: "priya@example.com", plan: "Premium", date: "5 hours ago" },
-  { name: "Amit Sharma", email: "amit@example.com", plan: "Premium", date: "1 day ago" },
-  { name: "Neha Gupta", email: "neha@example.com", plan: "Premium", date: "1 day ago" },
-  { name: "Vikram Patel", email: "vikram@example.com", plan: "Premium", date: "2 days ago" },
-];
+type StudentData = {
+  id: string;
+  name: string;
+  email: string;
+  isPaid: boolean;
+  subscriptionEnd?: string;
+};
 
 export function AdminOverview() {
+  const [students, setStudents] = useState<StudentData[]>([]);
+  const [totalQuestions, setTotalQuestions] = useState(0);
+  const [premiumCount, setPremiumCount] = useState(0);
+
+  useEffect(() => {
+    // Load real students from localStorage
+    const registeredUsers = JSON.parse(
+      window.localStorage.getItem("neet_registered_users") || "{}"
+    );
+    const studentList: StudentData[] = Object.values(registeredUsers).map(
+      (entry: any) => ({
+        id: entry.user.id,
+        name: entry.user.name,
+        email: entry.user.email,
+        isPaid: entry.user.isPaid || false,
+        subscriptionEnd: entry.user.subscriptionEnd,
+      })
+    );
+    setStudents(studentList);
+    setPremiumCount(studentList.filter((s) => s.isPaid).length);
+
+    // Load real questions count
+    const savedQuestions = JSON.parse(
+      window.localStorage.getItem("neet_admin_questions") || "[]"
+    );
+    setTotalQuestions(savedQuestions.length);
+  }, []);
+
+  const totalChapters = class11Chapters.length + class12Chapters.length;
+  const revenue = premiumCount * 499;
+
+  const stats = [
+    {
+      title: "Total Students",
+      value: students.length.toString(),
+      icon: Users,
+      color: "text-blue-500",
+      bgColor: "bg-blue-500/10",
+    },
+    {
+      title: "Total Questions",
+      value: totalQuestions.toString(),
+      icon: FileQuestion,
+      color: "text-green-500",
+      bgColor: "bg-green-500/10",
+    },
+    {
+      title: "Active Chapters",
+      value: totalChapters.toString(),
+      icon: BookOpen,
+      color: "text-purple-500",
+      bgColor: "bg-purple-500/10",
+    },
+    {
+      title: "Est. Revenue",
+      value: `₹${revenue.toLocaleString()}`,
+      icon: IndianRupee,
+      color: "text-amber-500",
+      bgColor: "bg-amber-500/10",
+    },
+  ];
+
+  // Recent premium students
+  const recentPremium = students
+    .filter((s) => s.isPaid)
+    .slice(0, 5);
+
   return (
     <div className="space-y-6">
       {/* Stats Grid */}
@@ -69,11 +93,6 @@ export function AdminOverview() {
                 <div className={`h-10 w-10 rounded-lg ${stat.bgColor} flex items-center justify-center`}>
                   <stat.icon className={`h-5 w-5 ${stat.color}`} />
                 </div>
-                <span className={`text-sm font-medium ${
-                  stat.change.startsWith("+") ? "text-green-600" : "text-muted-foreground"
-                }`}>
-                  {stat.change}
-                </span>
               </div>
               <div className="mt-4">
                 <p className="text-2xl font-bold text-foreground">{stat.value}</p>
@@ -85,29 +104,36 @@ export function AdminOverview() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Revenue Chart */}
+        {/* Premium vs Free Chart */}
         <Card className="border-border">
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
               <TrendingUp className="h-5 w-5 text-primary" />
-              Revenue Trend
+              Students Overview
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={revenueData}>
+                <LineChart
+                  data={[
+                    { label: "Free", count: students.length - premiumCount },
+                    { label: "Premium", count: premiumCount },
+                  ]}
+                >
                   <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="month" />
-                  <YAxis tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`} />
-                  <Tooltip 
+                  <XAxis dataKey="label" />
+                  <YAxis allowDecimals={false} />
+                  <Tooltip
                     content={({ active, payload }) => {
                       if (active && payload && payload.length) {
                         return (
                           <div className="bg-card border border-border rounded-lg p-3 shadow-lg">
-                            <p className="font-medium text-foreground">{payload[0].payload.month}</p>
+                            <p className="font-medium text-foreground">
+                              {payload[0].payload.label}
+                            </p>
                             <p className="text-sm text-muted-foreground">
-                              Revenue: ₹{payload[0].value?.toLocaleString()}
+                              Students: {payload[0].value}
                             </p>
                           </div>
                         );
@@ -115,10 +141,10 @@ export function AdminOverview() {
                       return null;
                     }}
                   />
-                  <Line 
-                    type="monotone" 
-                    dataKey="revenue" 
-                    stroke="hsl(var(--primary))" 
+                  <Line
+                    type="monotone"
+                    dataKey="count"
+                    stroke="hsl(var(--primary))"
                     strokeWidth={2}
                     dot={{ fill: "hsl(var(--primary))" }}
                   />
@@ -128,29 +154,41 @@ export function AdminOverview() {
           </CardContent>
         </Card>
 
-        {/* Recent Subscriptions */}
+        {/* Recent Premium Students */}
         <Card className="border-border">
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
               <CreditCard className="h-5 w-5 text-primary" />
-              Recent Subscriptions
+              Recent Premium Students
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              {recentSubscriptions.map((sub, index) => (
-                <div key={index} className="flex items-center justify-between">
-                  <div>
-                    <p className="font-medium text-foreground">{sub.name}</p>
-                    <p className="text-sm text-muted-foreground">{sub.email}</p>
+            {recentPremium.length === 0 ? (
+              <div className="text-center py-8">
+                <p className="text-muted-foreground text-sm">
+                  No premium students yet.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {recentPremium.map((student) => (
+                  <div key={student.id} className="flex items-center justify-between">
+                    <div>
+                      <p className="font-medium text-foreground">{student.name}</p>
+                      <p className="text-sm text-muted-foreground">{student.email}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm font-medium text-foreground">Premium</p>
+                      <p className="text-xs text-muted-foreground">
+                        {student.subscriptionEnd
+                          ? `Expires: ${new Date(student.subscriptionEnd).toLocaleDateString()}`
+                          : "Active"}
+                      </p>
+                    </div>
                   </div>
-                  <div className="text-right">
-                    <p className="text-sm font-medium text-foreground">{sub.plan}</p>
-                    <p className="text-xs text-muted-foreground">{sub.date}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>

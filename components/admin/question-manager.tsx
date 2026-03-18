@@ -24,7 +24,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { class11Chapters, class12Chapters, type Question } from "@/lib/data";
-import { Plus, Search, Trash2, ImagePlus, X } from "lucide-react";
+import { Plus, Search, Trash2, ImagePlus, X, Edit } from "lucide-react";
 
 const STORAGE_KEY = "neet_admin_questions";
 
@@ -45,27 +45,29 @@ function saveToStorage(questions: Question[]) {
   } catch {}
 }
 
+const emptyForm = {
+  question: "",
+  optionA: "",
+  optionB: "",
+  optionC: "",
+  optionD: "",
+  correctAnswer: "A" as "A" | "B" | "C" | "D",
+  explanation: "",
+  chapterId: 1,
+  source: "NCERT" as "PYQ" | "NCERT",
+  imageUrl: "",
+};
+
 export function QuestionManager() {
-  const [questions, setQuestions] = useState<Question[]>([]);
+  const [questions, setQuestions] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterChapter, setFilterChapter] = useState("all");
   const [filterSource, setFilterSource] = useState("all");
-  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [editingId, setEditingId] = useState<number | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const [newQuestion, setNewQuestion] = useState({
-    question: "",
-    optionA: "",
-    optionB: "",
-    optionC: "",
-    optionD: "",
-    correctAnswer: "A" as "A" | "B" | "C" | "D",
-    explanation: "",
-    chapterId: 1,
-    source: "NCERT" as "PYQ" | "NCERT",
-    imageUrl: "" as string,
-  });
+  const [form, setForm] = useState({ ...emptyForm });
 
   const allChapters = [...class11Chapters, ...class12Chapters];
 
@@ -76,21 +78,86 @@ export function QuestionManager() {
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
-    // Convert to base64 for localStorage storage
     const reader = new FileReader();
     reader.onloadend = () => {
       const base64 = reader.result as string;
       setImagePreview(base64);
-      setNewQuestion({ ...newQuestion, imageUrl: base64 });
+      setForm({ ...form, imageUrl: base64 });
     };
     reader.readAsDataURL(file);
   };
 
   const handleRemoveImage = () => {
     setImagePreview(null);
-    setNewQuestion({ ...newQuestion, imageUrl: "" });
+    setForm({ ...form, imageUrl: "" });
     if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const openAddDialog = () => {
+    setEditingId(null);
+    setForm({ ...emptyForm });
+    setImagePreview(null);
+    setIsDialogOpen(true);
+  };
+
+  const openEditDialog = (question: any) => {
+    setEditingId(question.id);
+    setForm({
+      question: question.question,
+      optionA: question.options.A,
+      optionB: question.options.B,
+      optionC: question.options.C,
+      optionD: question.options.D,
+      correctAnswer: question.correctAnswer,
+      explanation: question.explanation,
+      chapterId: question.chapterId,
+      source: question.source,
+      imageUrl: question.imageUrl || "",
+    });
+    setImagePreview(question.imageUrl || null);
+    setIsDialogOpen(true);
+  };
+
+  const handleSave = () => {
+    const chapter = allChapters.find((c) => c.id === form.chapterId);
+    const questionData: any = {
+      id: editingId ?? Date.now(),
+      question: form.question,
+      options: {
+        A: form.optionA,
+        B: form.optionB,
+        C: form.optionC,
+        D: form.optionD,
+      },
+      correctAnswer: form.correctAnswer,
+      explanation: form.explanation,
+      chapterId: form.chapterId,
+      chapterName: chapter?.name || "",
+      source: form.source,
+    };
+    if (form.imageUrl) questionData.imageUrl = form.imageUrl;
+
+    let updated;
+    if (editingId !== null) {
+      // Edit existing
+      updated = questions.map((q) => (q.id === editingId ? questionData : q));
+    } else {
+      // Add new
+      updated = [questionData, ...questions];
+    }
+
+    setQuestions(updated);
+    saveToStorage(updated);
+    setIsDialogOpen(false);
+    setImagePreview(null);
+    setForm({ ...emptyForm });
+    setEditingId(null);
+  };
+
+  const handleDeleteQuestion = (id: number) => {
+    const updated = questions.filter((q) => q.id !== id);
+    setQuestions(updated);
+    saveToStorage(updated);
   };
 
   const filteredQuestions = questions.filter((q) => {
@@ -100,53 +167,128 @@ export function QuestionManager() {
     return matchesSearch && matchesChapter && matchesSource;
   });
 
-  const handleAddQuestion = () => {
-    const chapter = allChapters.find((c) => c.id === newQuestion.chapterId);
-    const newQ: any = {
-      id: Date.now(),
-      question: newQuestion.question,
-      options: {
-        A: newQuestion.optionA,
-        B: newQuestion.optionB,
-        C: newQuestion.optionC,
-        D: newQuestion.optionD,
-      },
-      correctAnswer: newQuestion.correctAnswer,
-      explanation: newQuestion.explanation,
-      chapterId: newQuestion.chapterId,
-      chapterName: chapter?.name || "",
-      source: newQuestion.source,
-    };
+  const QuestionForm = (
+    <div className="space-y-4 py-4">
+      <div className="space-y-2">
+        <Label>Question</Label>
+        <Textarea
+          placeholder="Enter the question..."
+          value={form.question}
+          onChange={(e) => setForm({ ...form, question: e.target.value })}
+        />
+      </div>
 
-    // Add image if present
-    if (newQuestion.imageUrl) {
-      newQ.imageUrl = newQuestion.imageUrl;
-    }
+      {/* Image Upload */}
+      <div className="space-y-2">
+        <Label>Question Image (Optional)</Label>
+        <div className="border-2 border-dashed border-border rounded-lg p-4">
+          {imagePreview ? (
+            <div className="relative">
+              <img
+                src={imagePreview}
+                alt="Question"
+                className="max-h-48 mx-auto rounded-lg object-contain"
+              />
+              <Button
+                variant="destructive"
+                size="icon"
+                className="absolute top-2 right-2 h-6 w-6"
+                onClick={handleRemoveImage}
+              >
+                <X className="h-3 w-3" />
+              </Button>
+            </div>
+          ) : (
+            <div className="text-center">
+              <ImagePlus className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+              <p className="text-sm text-muted-foreground mb-2">Upload an image for this question</p>
+              <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
+                Choose Image
+              </Button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleImageUpload}
+              />
+            </div>
+          )}
+        </div>
+      </div>
 
-    const updated = [newQ, ...questions];
-    setQuestions(updated);
-    saveToStorage(updated);
-    setIsAddDialogOpen(false);
-    setImagePreview(null);
-    setNewQuestion({
-      question: "",
-      optionA: "",
-      optionB: "",
-      optionC: "",
-      optionD: "",
-      correctAnswer: "A",
-      explanation: "",
-      chapterId: 1,
-      source: "NCERT",
-      imageUrl: "",
-    });
-  };
+      {/* Options */}
+      <div className="grid grid-cols-2 gap-4">
+        {(["A", "B", "C", "D"] as const).map((opt) => (
+          <div key={opt} className="space-y-2">
+            <Label>Option {opt}</Label>
+            <Input
+              value={form[`option${opt}` as keyof typeof form] as string}
+              onChange={(e) => setForm({ ...form, [`option${opt}`]: e.target.value })}
+            />
+          </div>
+        ))}
+      </div>
 
-  const handleDeleteQuestion = (id: number) => {
-    const updated = questions.filter((q) => q.id !== id);
-    setQuestions(updated);
-    saveToStorage(updated);
-  };
+      {/* Settings */}
+      <div className="grid grid-cols-3 gap-4">
+        <div className="space-y-2">
+          <Label>Correct Answer</Label>
+          <Select
+            value={form.correctAnswer}
+            onValueChange={(v) => setForm({ ...form, correctAnswer: v as "A" | "B" | "C" | "D" })}
+          >
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {["A", "B", "C", "D"].map((v) => (
+                <SelectItem key={v} value={v}>{v}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-2">
+          <Label>Chapter</Label>
+          <Select
+            value={form.chapterId.toString()}
+            onValueChange={(v) => setForm({ ...form, chapterId: parseInt(v) })}
+          >
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {allChapters.map((chapter) => (
+                <SelectItem key={chapter.id} value={chapter.id.toString()}>
+                  {chapter.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-2">
+          <Label>Source</Label>
+          <Select
+            value={form.source}
+            onValueChange={(v) => setForm({ ...form, source: v as "PYQ" | "NCERT" })}
+          >
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="NCERT">NCERT</SelectItem>
+              <SelectItem value="PYQ">PYQ</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      {/* Explanation */}
+      <div className="space-y-2">
+        <Label>Explanation</Label>
+        <Textarea
+          placeholder="Enter detailed explanation referencing NCERT concepts..."
+          value={form.explanation}
+          onChange={(e) => setForm({ ...form, explanation: e.target.value })}
+          rows={4}
+        />
+      </div>
+    </div>
+  );
 
   return (
     <div className="space-y-6">
@@ -185,236 +327,38 @@ export function QuestionManager() {
             </SelectContent>
           </Select>
         </div>
-        <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-          <DialogTrigger asChild>
-            <Button className="gap-2 w-full sm:w-auto">
-              <Plus className="h-4 w-4" />
-              Add Question
-            </Button>
-          </DialogTrigger>
+
+        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+          <Button className="gap-2 w-full sm:w-auto" onClick={openAddDialog}>
+            <Plus className="h-4 w-4" />
+            Add Question
+          </Button>
           <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>Add New Question</DialogTitle>
+              <DialogTitle>{editingId ? "Edit Question" : "Add New Question"}</DialogTitle>
               <DialogDescription>
-                Create a new MCQ for the question bank
+                {editingId ? "Update the question details" : "Create a new MCQ for the question bank"}
               </DialogDescription>
             </DialogHeader>
-            <div className="space-y-4 py-4">
-
-              {/* Question Text */}
-              <div className="space-y-2">
-                <Label htmlFor="question">Question</Label>
-                <Textarea
-                  id="question"
-                  placeholder="Enter the question..."
-                  value={newQuestion.question}
-                  onChange={(e) =>
-                    setNewQuestion({ ...newQuestion, question: e.target.value })
-                  }
-                />
-              </div>
-
-              {/* Image Upload */}
-              <div className="space-y-2">
-                <Label>Question Image (Optional)</Label>
-                <div className="border-2 border-dashed border-border rounded-lg p-4">
-                  {imagePreview ? (
-                    <div className="relative">
-                      <img
-                        src={imagePreview}
-                        alt="Question image"
-                        className="max-h-48 mx-auto rounded-lg object-contain"
-                      />
-                      <Button
-                        variant="destructive"
-                        size="icon"
-                        className="absolute top-2 right-2 h-6 w-6"
-                        onClick={handleRemoveImage}
-                      >
-                        <X className="h-3 w-3" />
-                      </Button>
-                    </div>
-                  ) : (
-                    <div className="text-center">
-                      <ImagePlus className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
-                      <p className="text-sm text-muted-foreground mb-2">
-                        Upload an image for this question
-                      </p>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => fileInputRef.current?.click()}
-                      >
-                        Choose Image
-                      </Button>
-                      <input
-                        ref={fileInputRef}
-                        type="file"
-                        accept="image/*"
-                        className="hidden"
-                        onChange={handleImageUpload}
-                      />
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Options */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="optionA">Option A</Label>
-                  <Input
-                    id="optionA"
-                    value={newQuestion.optionA}
-                    onChange={(e) =>
-                      setNewQuestion({ ...newQuestion, optionA: e.target.value })
-                    }
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="optionB">Option B</Label>
-                  <Input
-                    id="optionB"
-                    value={newQuestion.optionB}
-                    onChange={(e) =>
-                      setNewQuestion({ ...newQuestion, optionB: e.target.value })
-                    }
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="optionC">Option C</Label>
-                  <Input
-                    id="optionC"
-                    value={newQuestion.optionC}
-                    onChange={(e) =>
-                      setNewQuestion({ ...newQuestion, optionC: e.target.value })
-                    }
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="optionD">Option D</Label>
-                  <Input
-                    id="optionD"
-                    value={newQuestion.optionD}
-                    onChange={(e) =>
-                      setNewQuestion({ ...newQuestion, optionD: e.target.value })
-                    }
-                  />
-                </div>
-              </div>
-
-              {/* Settings */}
-              <div className="grid grid-cols-3 gap-4">
-                <div className="space-y-2">
-                  <Label>Correct Answer</Label>
-                  <Select
-                    value={newQuestion.correctAnswer}
-                    onValueChange={(v) =>
-                      setNewQuestion({
-                        ...newQuestion,
-                        correctAnswer: v as "A" | "B" | "C" | "D",
-                      })
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="A">A</SelectItem>
-                      <SelectItem value="B">B</SelectItem>
-                      <SelectItem value="C">C</SelectItem>
-                      <SelectItem value="D">D</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>Chapter</Label>
-                  <Select
-                    value={newQuestion.chapterId.toString()}
-                    onValueChange={(v) =>
-                      setNewQuestion({
-                        ...newQuestion,
-                        chapterId: parseInt(v),
-                      })
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {allChapters.map((chapter) => (
-                        <SelectItem
-                          key={chapter.id}
-                          value={chapter.id.toString()}
-                        >
-                          {chapter.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>Source</Label>
-                  <Select
-                    value={newQuestion.source}
-                    onValueChange={(v) =>
-                      setNewQuestion({
-                        ...newQuestion,
-                        source: v as "PYQ" | "NCERT",
-                      })
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="NCERT">NCERT</SelectItem>
-                      <SelectItem value="PYQ">PYQ</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              {/* Explanation */}
-              <div className="space-y-2">
-                <Label htmlFor="explanation">Explanation</Label>
-                <Textarea
-                  id="explanation"
-                  placeholder="Enter detailed explanation referencing NCERT concepts..."
-                  value={newQuestion.explanation}
-                  onChange={(e) =>
-                    setNewQuestion({
-                      ...newQuestion,
-                      explanation: e.target.value,
-                    })
-                  }
-                  rows={4}
-                />
-              </div>
-            </div>
+            {QuestionForm}
             <DialogFooter>
-              <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
-                Cancel
+              <Button variant="outline" onClick={() => setIsDialogOpen(false)}>Cancel</Button>
+              <Button onClick={handleSave}>
+                {editingId ? "Save Changes" : "Add Question"}
               </Button>
-              <Button onClick={handleAddQuestion}>Add Question</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
       </div>
 
-      {/* Questions List */}
       <Card className="border-border">
         <CardHeader>
-          <CardTitle className="text-lg">
-            Questions ({filteredQuestions.length})
-          </CardTitle>
+          <CardTitle className="text-lg">Questions ({filteredQuestions.length})</CardTitle>
         </CardHeader>
         <CardContent>
           {questions.length === 0 ? (
             <div className="text-center py-12">
-              <p className="text-muted-foreground">
-                No questions added yet. Click "Add Question" to get started!
-              </p>
+              <p className="text-muted-foreground">No questions added yet. Click "Add Question" to get started!</p>
             </div>
           ) : (
             <div className="space-y-4">
@@ -422,7 +366,6 @@ export function QuestionManager() {
                 <div key={question.id} className="p-4 border border-border rounded-lg">
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex-1">
-                      {/* Show image if present */}
                       {question.imageUrl && (
                         <img
                           src={question.imageUrl}
@@ -430,9 +373,7 @@ export function QuestionManager() {
                           className="max-h-32 mb-2 rounded-lg object-contain"
                         />
                       )}
-                      <p className="font-medium text-foreground mb-2">
-                        {question.question}
-                      </p>
+                      <p className="font-medium text-foreground mb-2">{question.question}</p>
                       <div className="flex items-center gap-2 flex-wrap">
                         <Badge variant="secondary">{question.chapterName}</Badge>
                         <Badge variant={question.source === "PYQ" ? "default" : "outline"}>
@@ -442,19 +383,26 @@ export function QuestionManager() {
                           Correct: {question.correctAnswer}
                         </span>
                         {question.imageUrl && (
-                          <Badge variant="outline" className="text-blue-600">
-                            📷 Has Image
-                          </Badge>
+                          <Badge variant="outline" className="text-blue-600">📷 Has Image</Badge>
                         )}
                       </div>
                     </div>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => handleDeleteQuestion(question.id)}
-                    >
-                      <Trash2 className="h-4 w-4 text-destructive" />
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => openEditDialog(question)}
+                      >
+                        <Edit className="h-4 w-4 text-primary" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleDeleteQuestion(question.id)}
+                      >
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </div>
                   </div>
                 </div>
               ))}

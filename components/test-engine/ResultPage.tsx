@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -22,8 +22,8 @@ export type ResultPageProps = {
   questions: Question[];
   answers: (string | null)[];
   timeTaken: number;
-  testType: string; // used for analytics and history
-  testLabel?: string; // human-readable label shown in header
+  testType: string;
+  testLabel?: string;
   onRetake: () => void;
 };
 
@@ -35,6 +35,7 @@ export function ResultPage({
   testLabel,
   onRetake,
 }: ResultPageProps) {
+  const savedRef = useRef(false);
   const totalQuestions = questions.length;
 
   let correctCount = 0;
@@ -53,23 +54,19 @@ export function ResultPage({
   });
 
   const attemptedCount = answers.filter((answer) => answer !== null).length;
-
   const totalMarks = totalQuestions * 4;
   const score = correctCount * 4 - incorrectCount;
   const answered = attemptedCount;
   const accuracy = answered > 0 ? Math.round((correctCount / answered) * 100) : 0;
   const attemptRate = Math.round((answered / totalQuestions) * 100);
-  const avgTimePerQuestion =
-    attemptedCount > 0 ? Math.round(timeTaken / attemptedCount) : 0;
+  const avgTimePerQuestion = attemptedCount > 0 ? Math.round(timeTaken / attemptedCount) : 0;
 
   const formatTime = (seconds: number) => {
     const hours = Math.floor(seconds / 3600);
     const mins = Math.floor((seconds % 3600) / 60);
     const secs = seconds % 60;
     if (hours > 0) {
-      return `${hours}:${mins.toString().padStart(2, "0")}:${secs
-        .toString()
-        .padStart(2, "0")}`;
+      return `${hours}:${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
     }
     return `${mins}:${secs.toString().padStart(2, "0")}`;
   };
@@ -100,14 +97,13 @@ export function ResultPage({
   });
 
   const topicPerformance = Object.entries(topicPerformanceMap).map(
-    ([topic, { correct, attempted }]) => ({
-      topic,
-      correct,
-      attempted,
-    })
+    ([topic, { correct, attempted }]) => ({ topic, correct, attempted })
   );
 
   useEffect(() => {
+    if (savedRef.current) return;
+    savedRef.current = true;
+
     const result: TestResult = {
       testId: `${Date.now()}`,
       date: new Date().toISOString(),
@@ -124,6 +120,37 @@ export function ResultPage({
       topicPerformance,
     };
     saveResult(result);
+
+    // Save progress per user
+    try {
+      const storedUser = localStorage.getItem("neet_user");
+      if (storedUser) {
+        const user = JSON.parse(storedUser);
+        const progressKey = `neet_progress_${user.id}`;
+        const existing = JSON.parse(
+          localStorage.getItem(progressKey) ||
+          localStorage.getItem("neet_progress") ||
+          '{"totalAttempted":0,"totalCorrect":0,"chapterProgress":{}}'
+        );
+        questions.forEach((q, i) => {
+          const answer = answers[i];
+          if (answer !== null) {
+            const isCorrect = answer === q.correctAnswer;
+            existing.totalAttempted += 1;
+            existing.totalCorrect += isCorrect ? 1 : 0;
+            if (!existing.chapterProgress[q.chapterId]) {
+              existing.chapterProgress[q.chapterId] = { attempted: 0, correct: 0 };
+            }
+            existing.chapterProgress[q.chapterId].attempted += 1;
+            existing.chapterProgress[q.chapterId].correct += isCorrect ? 1 : 0;
+          }
+        });
+        localStorage.setItem(progressKey, JSON.stringify(existing));
+        localStorage.setItem("neet_progress", JSON.stringify(existing));
+      }
+    } catch {
+      // ignore
+    }
   }, []);
 
   const weakTopics = (() => {
@@ -142,7 +169,7 @@ export function ResultPage({
       }
     });
 
-    const weakTopicsArray = Object.entries(stats)
+    return Object.entries(stats)
       .map(([chapter, { correct, attempted }]) => ({
         chapter,
         attempted,
@@ -151,14 +178,11 @@ export function ResultPage({
       .filter((topic) => topic.attempted > 0)
       .sort((a, b) => a.accuracy - b.accuracy)
       .slice(0, 5);
-
-    return weakTopicsArray;
   })();
 
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="max-w-4xl mx-auto">
-        {/* Header */}
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center h-16 w-16 rounded-full bg-primary/10 mb-4">
             <Trophy className="h-8 w-8 text-primary" />
@@ -169,7 +193,6 @@ export function ResultPage({
           </p>
         </div>
 
-        {/* Score & Summary */}
         <Card className="border-border mb-8">
           <CardContent className="pt-6">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-center">
@@ -189,7 +212,6 @@ export function ResultPage({
           </CardContent>
         </Card>
 
-        {/* Result Statistics */}
         <Card className="border-border mb-8">
           <CardHeader>
             <CardTitle className="text-lg">Result Statistics</CardTitle>
@@ -228,7 +250,6 @@ export function ResultPage({
           </CardContent>
         </Card>
 
-        {/* Analytics (full test only) */}
         {testType === "full" && (
           <Card className="border-border mb-8">
             <CardHeader>
@@ -264,30 +285,26 @@ export function ResultPage({
                   </CardContent>
                 </Card>
               </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <Card className="border-border md:col-span-2">
-                  <CardContent className="pt-6">
-                    <p className="text-sm font-medium text-foreground mb-2">Weak Topics</p>
-                    {weakTopics.length > 0 ? (
-                      <ul className="space-y-1 text-sm text-muted-foreground">
-                        {weakTopics.map((topic) => (
-                          <li key={topic.chapter}>
-                            <span className="font-medium text-foreground">{topic.chapter}</span> — {Math.round(topic.accuracy)}% accuracy
-                          </li>
-                        ))}
-                      </ul>
-                    ) : (
-                      <p className="text-sm text-muted-foreground">No weak topics detected yet.</p>
-                    )}
-                  </CardContent>
-                </Card>
-              </div>
+              <Card className="border-border">
+                <CardContent className="pt-6">
+                  <p className="text-sm font-medium text-foreground mb-2">Weak Topics</p>
+                  {weakTopics.length > 0 ? (
+                    <ul className="space-y-1 text-sm text-muted-foreground">
+                      {weakTopics.map((topic) => (
+                        <li key={topic.chapter}>
+                          <span className="font-medium text-foreground">{topic.chapter}</span> — {Math.round(topic.accuracy)}% accuracy
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">No weak topics detected yet.</p>
+                  )}
+                </CardContent>
+              </Card>
             </CardContent>
           </Card>
         )}
 
-        {/* Answer Review */}
         <Card className="border-border mb-8">
           <CardHeader>
             <CardTitle className="text-lg">Answer Review</CardTitle>
@@ -298,7 +315,6 @@ export function ResultPage({
                 const userAnswer = answers[index];
                 const isCorrect = userAnswer === question.correctAnswer;
                 const wasAttempted = userAnswer !== null;
-
                 return (
                   <div key={index} className="p-4 border border-border rounded-lg">
                     <div className="flex items-start justify-between gap-4 mb-2">
@@ -317,17 +333,13 @@ export function ResultPage({
                     </div>
                     <div className="text-sm text-muted-foreground">
                       {wasAttempted && (
-                        <p>
-                          Your answer: {userAnswer} - {question.options[userAnswer as keyof typeof question.options]}
-                        </p>
+                        <p>Your answer: {userAnswer} - {question.options[userAnswer as keyof typeof question.options]}</p>
                       )}
                       <p className={isCorrect ? "text-green-600" : "text-red-600"}>
                         Correct answer: {question.correctAnswer} - {question.options[question.correctAnswer]}
                       </p>
                       {question.explanation && (
-                        <p className="mt-2">
-                          <strong>Explanation:</strong> {question.explanation}
-                        </p>
+                        <p className="mt-2"><strong>Explanation:</strong> {question.explanation}</p>
                       )}
                     </div>
                   </div>
@@ -337,7 +349,6 @@ export function ResultPage({
           </CardContent>
         </Card>
 
-        {/* Actions */}
         <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
           <Button variant="outline" asChild className="gap-2 w-full sm:w-auto">
             <Link href="/mock-test">
@@ -357,4 +368,3 @@ export function ResultPage({
     </div>
   );
 }
-

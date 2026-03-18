@@ -39,7 +39,7 @@ function DashboardContent() {
       try {
         const progressKey = `neet_progress_${user.id}`;
         // Try per-user key first, fallback to old key
-        const stored = localStorage.getItem(progressKey) || localStorage.getItem("neet_progress");
+        const stored = localStorage.getItem(progressKey);
         if (stored) {
           setProgress(JSON.parse(stored));
           // Migrate to per-user key

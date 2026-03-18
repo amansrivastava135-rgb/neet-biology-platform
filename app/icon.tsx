@@ -16,12 +16,12 @@ export default function Icon() {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          background: '#2E6DA4',
+          background: '#16a34a',
           borderRadius: '6px',
         }}
       >
         <div style={{ color: 'white', fontSize: '20px', fontWeight: 'bold' }}>
-          B
+          N
         </div>
       </div>
     ),

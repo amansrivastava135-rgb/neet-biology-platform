@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,7 +24,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { class11Chapters, class12Chapters, type Question } from "@/lib/data";
-import { Plus, Search, Trash2 } from "lucide-react";
+import { Plus, Search, Trash2, ImagePlus, X } from "lucide-react";
 
 const STORAGE_KEY = "neet_admin_questions";
 
@@ -51,6 +51,9 @@ export function QuestionManager() {
   const [filterChapter, setFilterChapter] = useState("all");
   const [filterSource, setFilterSource] = useState("all");
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const [newQuestion, setNewQuestion] = useState({
     question: "",
     optionA: "",
@@ -61,6 +64,7 @@ export function QuestionManager() {
     explanation: "",
     chapterId: 1,
     source: "NCERT" as "PYQ" | "NCERT",
+    imageUrl: "" as string,
   });
 
   const allChapters = [...class11Chapters, ...class12Chapters];
@@ -68,6 +72,26 @@ export function QuestionManager() {
   useEffect(() => {
     setQuestions(loadFromStorage());
   }, []);
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Convert to base64 for localStorage storage
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const base64 = reader.result as string;
+      setImagePreview(base64);
+      setNewQuestion({ ...newQuestion, imageUrl: base64 });
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleRemoveImage = () => {
+    setImagePreview(null);
+    setNewQuestion({ ...newQuestion, imageUrl: "" });
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
 
   const filteredQuestions = questions.filter((q) => {
     const matchesSearch = q.question.toLowerCase().includes(searchQuery.toLowerCase());
@@ -78,7 +102,7 @@ export function QuestionManager() {
 
   const handleAddQuestion = () => {
     const chapter = allChapters.find((c) => c.id === newQuestion.chapterId);
-    const newQ: Question = {
+    const newQ: any = {
       id: Date.now(),
       question: newQuestion.question,
       options: {
@@ -93,10 +117,17 @@ export function QuestionManager() {
       chapterName: chapter?.name || "",
       source: newQuestion.source,
     };
+
+    // Add image if present
+    if (newQuestion.imageUrl) {
+      newQ.imageUrl = newQuestion.imageUrl;
+    }
+
     const updated = [newQ, ...questions];
     setQuestions(updated);
     saveToStorage(updated);
     setIsAddDialogOpen(false);
+    setImagePreview(null);
     setNewQuestion({
       question: "",
       optionA: "",
@@ -107,6 +138,7 @@ export function QuestionManager() {
       explanation: "",
       chapterId: 1,
       source: "NCERT",
+      imageUrl: "",
     });
   };
 
@@ -168,6 +200,8 @@ export function QuestionManager() {
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-4">
+
+              {/* Question Text */}
               <div className="space-y-2">
                 <Label htmlFor="question">Question</Label>
                 <Textarea
@@ -179,6 +213,53 @@ export function QuestionManager() {
                   }
                 />
               </div>
+
+              {/* Image Upload */}
+              <div className="space-y-2">
+                <Label>Question Image (Optional)</Label>
+                <div className="border-2 border-dashed border-border rounded-lg p-4">
+                  {imagePreview ? (
+                    <div className="relative">
+                      <img
+                        src={imagePreview}
+                        alt="Question image"
+                        className="max-h-48 mx-auto rounded-lg object-contain"
+                      />
+                      <Button
+                        variant="destructive"
+                        size="icon"
+                        className="absolute top-2 right-2 h-6 w-6"
+                        onClick={handleRemoveImage}
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="text-center">
+                      <ImagePlus className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+                      <p className="text-sm text-muted-foreground mb-2">
+                        Upload an image for this question
+                      </p>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => fileInputRef.current?.click()}
+                      >
+                        Choose Image
+                      </Button>
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={handleImageUpload}
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Options */}
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="optionA">Option A</Label>
@@ -221,6 +302,8 @@ export function QuestionManager() {
                   />
                 </div>
               </div>
+
+              {/* Settings */}
               <div className="grid grid-cols-3 gap-4">
                 <div className="space-y-2">
                   <Label>Correct Answer</Label>
@@ -291,6 +374,8 @@ export function QuestionManager() {
                   </Select>
                 </div>
               </div>
+
+              {/* Explanation */}
               <div className="space-y-2">
                 <Label htmlFor="explanation">Explanation</Label>
                 <Textarea
@@ -317,6 +402,7 @@ export function QuestionManager() {
         </Dialog>
       </div>
 
+      {/* Questions List */}
       <Card className="border-border">
         <CardHeader>
           <CardTitle className="text-lg">
@@ -332,10 +418,18 @@ export function QuestionManager() {
             </div>
           ) : (
             <div className="space-y-4">
-              {filteredQuestions.slice(0, 20).map((question) => (
+              {filteredQuestions.slice(0, 20).map((question: any) => (
                 <div key={question.id} className="p-4 border border-border rounded-lg">
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex-1">
+                      {/* Show image if present */}
+                      {question.imageUrl && (
+                        <img
+                          src={question.imageUrl}
+                          alt="Question"
+                          className="max-h-32 mb-2 rounded-lg object-contain"
+                        />
+                      )}
                       <p className="font-medium text-foreground mb-2">
                         {question.question}
                       </p>
@@ -347,6 +441,11 @@ export function QuestionManager() {
                         <span className="text-sm text-muted-foreground">
                           Correct: {question.correctAnswer}
                         </span>
+                        {question.imageUrl && (
+                          <Badge variant="outline" className="text-blue-600">
+                            📷 Has Image
+                          </Badge>
+                        )}
                       </div>
                     </div>
                     <Button

@@ -425,7 +425,13 @@ export function TestEngine({
                     Question {currentIndex + 1} of {questions.length}
                   </span>
                 </div>
-
+{(currentQuestion as any).imageUrl && (
+  <img
+    src={(currentQuestion as any).imageUrl}
+    alt="Question image"
+    className="max-h-64 mx-auto mb-4 rounded-lg object-contain"
+  />
+)}
                 <h2 className="text-lg font-medium text-foreground mb-6 leading-relaxed">
                   {currentQuestion.question}
                 </h2>

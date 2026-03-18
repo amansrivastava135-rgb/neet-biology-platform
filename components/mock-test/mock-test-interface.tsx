@@ -11,10 +11,30 @@ type MockTestInterfaceProps = {
 };
 
 export function MockTestInterface({ testType, onSubmit, isPaidUser }: MockTestInterfaceProps) {
-  const questions = useMemo<Question[]>(
-    () => (testType === "full" ? sampleQuestions.slice(0, 180) : sampleQuestions.slice(0, 10)),
-    [testType]
-  );
+  const questions = useMemo<Question[]>(() => {
+    // Admin questions load karo
+    let adminQuestions: Question[] = [];
+    try {
+      if (typeof window !== "undefined") {
+        const stored = window.localStorage.getItem("neet_admin_questions");
+        if (stored) {
+          adminQuestions = JSON.parse(stored);
+        }
+      }
+    } catch {}
+
+    // Admin questions hain toh unhe use karo, warna sampleQuestions
+    const allQuestions = adminQuestions.length > 0
+      ? [...adminQuestions, ...sampleQuestions]
+      : sampleQuestions;
+
+    // Shuffle karo
+    const shuffled = [...allQuestions].sort(() => Math.random() - 0.5);
+
+    return testType === "full"
+      ? shuffled.slice(0, Math.min(180, shuffled.length))
+      : shuffled.slice(0, Math.min(10, shuffled.length));
+  }, [testType]);
 
   const totalTime = testType === "full" ? 180 * 60 : 10 * 60;
   const storageKey = `neet-mock-test-${testType}`;

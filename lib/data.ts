@@ -1605,7 +1605,19 @@ export function getChapterById(id: number) {
 }
 
 export function getQuestionsByChapter(chapterId: number): Question[] {
-  return sampleQuestions.filter(q => q.chapterId === chapterId);
+  // Include admin questions along with sample questions
+  let adminQuestions: Question[] = [];
+  try {
+    if (typeof window !== "undefined") {
+      const stored = window.localStorage.getItem("neet_admin_questions");
+      if (stored) {
+        adminQuestions = JSON.parse(stored);
+      }
+    }
+  } catch {}
+
+  const allQuestions = [...adminQuestions, ...sampleQuestions];
+  return allQuestions.filter(q => q.chapterId === chapterId);
 }
 
 export function getDemoQuestions(): Question[] {

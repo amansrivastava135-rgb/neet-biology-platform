@@ -77,6 +77,16 @@ export function StudentManager() {
       };
       localStorage.setItem("neet_registered_users", JSON.stringify(registeredUsers));
       loadStudents();
+      // If this student is currently logged in, update their session too
+      const currentUser = localStorage.getItem("neet_user");
+      if (currentUser) {
+        const user = JSON.parse(currentUser);
+        if (user.email === email) {
+          const updatedUser = registeredUsers[email].user;
+          localStorage.setItem("neet_user", JSON.stringify(updatedUser));
+          document.cookie = `neet_user=${encodeURIComponent(JSON.stringify(updatedUser))}; path=/; max-age=${60 * 60 * 24 * 365}`;
+        }
+      }
       alert(`✅ Premium activated for ${email}!`);
     }
   };

@@ -16,7 +16,6 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import {
-  Clock,
   Flag,
   ChevronLeft,
   ChevronRight,
@@ -36,13 +35,41 @@ export type TestSubmitPayload = {
 
 export type TestEngineProps = {
   questions: Question[];
-  totalTime: number; // in seconds
+  totalTime: number;
   storageKey: string;
   onSubmit: (payload: TestSubmitPayload) => void;
   isPaidUser: boolean;
   testLabel: string;
-  initialTestType: string; // for persistence and display
+  initialTestType: string;
 };
+
+function saveProgressToStorage(questions: Question[], answers: (string | null)[]) {
+  try {
+    const storedUser = localStorage.getItem("neet_user");
+    if (!storedUser) return;
+    const user = JSON.parse(storedUser);
+    const progressKey = `neet_progress_${user.id}`;
+    const existing = JSON.parse(
+      localStorage.getItem(progressKey) ||
+      '{"totalAttempted":0,"totalCorrect":0,"chapterProgress":{}}'
+    );
+    questions.forEach((q, i) => {
+      const answer = answers[i];
+      if (answer !== null) {
+        const isCorrect = answer === q.correctAnswer;
+        existing.totalAttempted += 1;
+        existing.totalCorrect += isCorrect ? 1 : 0;
+        if (!existing.chapterProgress[q.chapterId]) {
+          existing.chapterProgress[q.chapterId] = { attempted: 0, correct: 0 };
+        }
+        existing.chapterProgress[q.chapterId].attempted += 1;
+        existing.chapterProgress[q.chapterId].correct += isCorrect ? 1 : 0;
+      }
+    });
+    localStorage.setItem(progressKey, JSON.stringify(existing));
+    localStorage.setItem("neet_progress", JSON.stringify(existing));
+  } catch {}
+}
 
 export function TestEngine({
   questions,
@@ -53,12 +80,12 @@ export function TestEngine({
   testLabel,
   initialTestType,
 }: TestEngineProps) {
-  // redirect if somehow a free user managed to load a full test
   useEffect(() => {
     if (initialTestType === "full" && !isPaidUser) {
       window.location.href = "/pricing";
     }
   }, [initialTestType, isPaidUser]);
+
   const savedState = useMemo(() => {
     if (typeof window === "undefined") return null;
     try {
@@ -70,23 +97,15 @@ export function TestEngine({
     }
   }, [storageKey]);
 
-  const [currentIndex, setCurrentIndex] = useState(() =>
-    savedState?.currentIndex ?? 0
-  );
+  const [currentIndex, setCurrentIndex] = useState(() => savedState?.currentIndex ?? 0);
   const [answers, setAnswers] = useState<(string | null)[]>(() => {
-    if (
-      Array.isArray(savedState?.answers) &&
-      savedState.answers.length === questions.length
-    ) {
+    if (Array.isArray(savedState?.answers) && savedState.answers.length === questions.length) {
       return savedState.answers;
     }
     return Array(questions.length).fill(null);
   });
   const [visitedQuestions, setVisitedQuestions] = useState<boolean[]>(() => {
-    if (
-      Array.isArray(savedState?.visited) &&
-      savedState.visited.length === questions.length
-    ) {
+    if (Array.isArray(savedState?.visited) && savedState.visited.length === questions.length) {
       return savedState.visited;
     }
     const arr = Array(questions.length).fill(false);
@@ -94,25 +113,19 @@ export function TestEngine({
     return arr;
   });
   const [markedForReview, setMarkedForReview] = useState<boolean[]>(() => {
-    if (
-      Array.isArray(savedState?.markedForReview) &&
-      savedState.markedForReview.length === questions.length
-    ) {
+    if (Array.isArray(savedState?.markedForReview) && savedState.markedForReview.length === questions.length) {
       return savedState.markedForReview;
     }
     return Array(questions.length).fill(false);
   });
   const [bookmarked, setBookmarked] = useState<boolean[]>(() => {
-    if (
-      Array.isArray(savedState?.bookmarked) &&
-      savedState.bookmarked.length === questions.length
-    ) {
+    if (Array.isArray(savedState?.bookmarked) && savedState.bookmarked.length === questions.length) {
       return savedState.bookmarked;
     }
     return Array(questions.length).fill(false);
   });
-  const hasTimer = totalTime > 0;
 
+  const hasTimer = totalTime > 0;
   const [timeLeft, setTimeLeft] = useState(() => {
     if (!hasTimer) return 0;
     if (typeof savedState?.timeLeft === "number") {
@@ -127,8 +140,21 @@ export function TestEngine({
   const answersRef = useRef(answers);
   const questionsRef = useRef(questions);
 
-  const currentQuestion = questions[currentIndex];
-  const currentAnswer = answers[currentIndex];
+  // Safety check — if no questions, show empty state
+  if (!questions || questions.length === 0) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-muted-foreground text-lg mb-4">No questions available for this set.</p>
+          <Button variant="outline" onClick={() => window.history.back()}>Go Back</Button>
+        </div>
+      </div>
+    );
+  }
+
+  const safeIndex = Math.min(currentIndex, questions.length - 1);
+  const currentQuestion = questions[safeIndex];
+  const currentAnswer = answers[safeIndex];
 
   const clearStoredTest = () => {
     if (typeof window === "undefined") return;
@@ -138,100 +164,15 @@ export function TestEngine({
   const persistTestState = () => {
     if (typeof window === "undefined") return;
     try {
-      localStorage.setItem(
-        storageKey,
-        JSON.stringify({
-          answers,
-          currentIndex,
-          visited: visitedQuestions,
-          markedForReview,
-          bookmarked,
-          timeLeft,
-        })
-      );
-    } catch {
-      // ignore
-    }
+      localStorage.setItem(storageKey, JSON.stringify({
+        answers, currentIndex, visited: visitedQuestions,
+        markedForReview, bookmarked, timeLeft,
+      }));
+    } catch {}
   };
 
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    if (!savedState) return;
-
-    setAnswers((prev) => {
-      if (prev.some((v) => v !== null)) return prev;
-      if (
-        Array.isArray(savedState.answers) &&
-        savedState.answers.length === questions.length
-      ) {
-        return savedState.answers;
-      }
-      return prev;
-    });
-
-    setVisitedQuestions((prev) => {
-      if (prev.some((v) => v)) return prev;
-      if (
-        Array.isArray(savedState.visited) &&
-        savedState.visited.length === questions.length
-      ) {
-        return savedState.visited;
-      }
-      return prev;
-    });
-
-    setMarkedForReview((prev) => {
-      if (prev.some((v) => v)) return prev;
-      if (
-        Array.isArray(savedState.markedForReview) &&
-        savedState.markedForReview.length === questions.length
-      ) {
-        return savedState.markedForReview;
-      }
-      return prev;
-    });
-
-    setBookmarked((prev) => {
-      if (prev.some((v) => v)) return prev;
-      if (
-        Array.isArray(savedState.bookmarked) &&
-        savedState.bookmarked.length === questions.length
-      ) {
-        return savedState.bookmarked;
-      }
-      return prev;
-    });
-
-    setCurrentIndex((prev: number) => {
-      if (prev !== 0) return prev;
-      if (typeof savedState.currentIndex === "number") {
-        return Math.min(
-          Math.max(0, savedState.currentIndex),
-          questions.length - 1
-        );
-      }
-      return prev;
-    });
-
-    setTimeLeft((prev) => {
-      if (prev !== totalTime) return prev;
-      if (typeof savedState.timeLeft === "number") {
-        return Math.min(
-          Math.max(0, savedState.timeLeft),
-          totalTime
-        );
-      }
-      return prev;
-    });
-  }, [questions.length, savedState, totalTime]);
-
-  useEffect(() => {
-    answersRef.current = answers;
-  }, [answers]);
-
-  useEffect(() => {
-    questionsRef.current = questions;
-  }, [questions]);
+  useEffect(() => { answersRef.current = answers; }, [answers]);
+  useEffect(() => { questionsRef.current = questions; }, [questions]);
 
   useEffect(() => {
     setVisitedQuestions((prev) => {
@@ -244,53 +185,30 @@ export function TestEngine({
 
   useEffect(() => {
     persistTestState();
-  }, [
-    answers,
-    currentIndex,
-    visitedQuestions,
-    markedForReview,
-    bookmarked,
-    timeLeft,
-  ]);
+  }, [answers, currentIndex, visitedQuestions, markedForReview, bookmarked, timeLeft]);
 
-  const submitTest = useCallback(
-    (autoSubmit = false) => {
-      if (hasSubmitted) return;
-      setHasSubmitted(true);
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-      }
+  const submitTest = useCallback((autoSubmit = false) => {
+    if (hasSubmitted) return;
+    setHasSubmitted(true);
+    if (timerRef.current) clearInterval(timerRef.current);
+    const timeTaken = hasTimer ? totalTime - timeLeft : 0;
+    clearStoredTest();
+    saveProgressToStorage(questionsRef.current, answersRef.current);
+    onSubmit({
+      questions: questionsRef.current,
+      answers: answersRef.current,
+      timeTaken: timeTaken > 0 ? timeTaken : hasTimer ? totalTime : 0,
+      testType: initialTestType,
+    });
+  }, [hasSubmitted, onSubmit, timeLeft, totalTime, initialTestType, hasTimer]);
 
-      const timeTaken = hasTimer ? totalTime - timeLeft : 0;
-      clearStoredTest();
-
-      onSubmit({
-        questions: questionsRef.current,
-        answers: answersRef.current,
-        timeTaken: timeTaken > 0 ? timeTaken : hasTimer ? totalTime : 0,
-        testType: initialTestType,
-      });
-    },
-    [hasSubmitted, onSubmit, timeLeft, totalTime, initialTestType, hasTimer]
-  );
-
-  // Timer effects
   useEffect(() => {
     if (hasSubmitted) return;
-
-    if (timerRef.current) {
-      clearInterval(timerRef.current);
-    }
-
+    if (timerRef.current) clearInterval(timerRef.current);
     timerRef.current = setInterval(() => {
       setTimeLeft((prev) => Math.max(prev - 1, 0));
     }, 1000);
-
-    return () => {
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-      }
-    };
+    return () => { if (timerRef.current) clearInterval(timerRef.current); };
   }, [hasSubmitted, totalTime]);
 
   useEffect(() => {
@@ -301,12 +219,7 @@ export function TestEngine({
   const handleAnswer = (option: string) => {
     setAnswers((prev) => {
       const updated = [...prev];
-      updated[currentIndex] = option;
-      return updated;
-    });
-    setVisitedQuestions((prev) => {
-      const updated = [...prev];
-      updated[currentIndex] = true;
+      updated[safeIndex] = option;
       return updated;
     });
   };
@@ -314,7 +227,7 @@ export function TestEngine({
   const handleMarkForReview = () => {
     setMarkedForReview((prev) => {
       const updated = [...prev];
-      updated[currentIndex] = !updated[currentIndex];
+      updated[safeIndex] = !updated[safeIndex];
       return updated;
     });
   };
@@ -322,7 +235,7 @@ export function TestEngine({
   const handleToggleBookmark = () => {
     setBookmarked((prev) => {
       const updated = [...prev];
-      updated[currentIndex] = !updated[currentIndex];
+      updated[safeIndex] = !updated[safeIndex];
       return updated;
     });
   };
@@ -330,7 +243,7 @@ export function TestEngine({
   const handleClearResponse = () => {
     setAnswers((prev) => {
       const updated = [...prev];
-      updated[currentIndex] = null;
+      updated[safeIndex] = null;
       return updated;
     });
   };
@@ -351,7 +264,6 @@ export function TestEngine({
 
   return (
     <div className="min-h-screen bg-background">
-      {/* simplified header for test label & timer */}
       <div className="sticky top-0 z-50 bg-card border-b border-border">
         <div className="container mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -371,9 +283,7 @@ export function TestEngine({
                     <AlertDialogDescription>
                       You have answered {answeredCount} out of {questions.length} questions.
                       {reviewCount > 0 && ` ${reviewCount} questions are marked for review.`}
-                      {bookmarkedCount > 0 && ` ${bookmarkedCount} questions are bookmarked.`}
                     </AlertDialogDescription>
-
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Answered</span>
                       <span className="font-medium text-foreground">{answeredCount}</span>
@@ -394,9 +304,7 @@ export function TestEngine({
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                   <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction onClick={() => submitTest(false)}>
-                    Submit Anyway
-                  </AlertDialogAction>
+                  <AlertDialogAction onClick={() => submitTest(false)}>Submit Anyway</AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
@@ -404,7 +312,6 @@ export function TestEngine({
         </div>
       </div>
 
-      {/* question area */}
       <div className="container mx-auto px-4 py-6">
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
           <div className="lg:col-span-3">
@@ -412,32 +319,30 @@ export function TestEngine({
               <CardContent className="p-6">
                 <div className="flex items-center justify-between mb-6">
                   <div className="flex items-center gap-2">
-                    <Badge variant="secondary">{currentQuestion.chapterName}</Badge>
-                    <Badge
-                      variant={
-                        currentQuestion.source === "PYQ" ? "default" : "outline"
-                      }
-                    >
-                      {currentQuestion.source}
+                    <Badge variant="secondary">{currentQuestion?.chapterName || "Biology"}</Badge>
+                    <Badge variant={currentQuestion?.source === "PYQ" ? "default" : "outline"}>
+                      {currentQuestion?.source || "NCERT"}
                     </Badge>
                   </div>
                   <span className="text-sm text-muted-foreground">
-                    Question {currentIndex + 1} of {questions.length}
+                    Question {safeIndex + 1} of {questions.length}
                   </span>
                 </div>
-{(currentQuestion as any).imageUrl && (
-  <img
-    src={(currentQuestion as any).imageUrl}
-    alt="Question image"
-    className="max-h-64 mx-auto mb-4 rounded-lg object-contain"
-  />
-)}
+
+                {currentQuestion && (currentQuestion as any).imageUrl && (
+                  <img
+                    src={(currentQuestion as any).imageUrl}
+                    alt="Question image"
+                    className="max-h-64 mx-auto mb-4 rounded-lg object-contain"
+                  />
+                )}
+
                 <h2 className="text-lg font-medium text-foreground mb-6 leading-relaxed">
-                  {currentQuestion.question}
+                  {currentQuestion?.question || ""}
                 </h2>
 
                 <div className="space-y-3 mb-6">
-                  {Object.entries(currentQuestion.options).map(([key, value]) => (
+                  {currentQuestion && Object.entries(currentQuestion.options).map(([key, value]) => (
                     <button
                       key={key}
                       className={`w-full p-4 text-left rounded-lg border transition-all flex items-start gap-3 ${
@@ -459,28 +364,18 @@ export function TestEngine({
                   <Button
                     variant="outline"
                     onClick={handleMarkForReview}
-                    className={
-                      markedForReview[currentIndex]
-                        ? "border-purple-500 text-purple-600"
-                        : ""
-                    }
+                    className={markedForReview[safeIndex] ? "border-purple-500 text-purple-600" : ""}
                   >
                     <Flag className="h-4 w-4 mr-2" />
-                    {markedForReview[currentIndex]
-                      ? "Marked for Review"
-                      : "Mark for Review"}
+                    {markedForReview[safeIndex] ? "Marked for Review" : "Mark for Review"}
                   </Button>
                   <Button
-                    variant={bookmarked[currentIndex] ? "secondary" : "outline"}
+                    variant={bookmarked[safeIndex] ? "secondary" : "outline"}
                     onClick={handleToggleBookmark}
-                    className={
-                      bookmarked[currentIndex]
-                        ? "border-amber-400 text-amber-700"
-                        : ""
-                    }
+                    className={bookmarked[safeIndex] ? "border-amber-400 text-amber-700" : ""}
                   >
                     <Bookmark className="h-4 w-4 mr-2" />
-                    {bookmarked[currentIndex] ? "Bookmarked" : "Bookmark"}
+                    {bookmarked[safeIndex] ? "Bookmarked" : "Bookmark"}
                   </Button>
                   <Button variant="ghost" onClick={handleClearResponse}>
                     Clear Response
@@ -492,22 +387,21 @@ export function TestEngine({
             <div className="flex items-center justify-between mt-6">
               <Button
                 variant="outline"
-                onClick={() => goToQuestion(Math.max(0, currentIndex - 1))}
-                disabled={currentIndex === 0}
+                onClick={() => goToQuestion(Math.max(0, safeIndex - 1))}
+                disabled={safeIndex === 0}
                 className="gap-2"
               >
                 <ChevronLeft className="h-4 w-4" />
                 Previous
               </Button>
 
-              {currentIndex === questions.length - 1 ? (
+              {safeIndex === questions.length - 1 ? (
                 <Button variant="destructive" onClick={() => submitTest(false)} className="gap-2">
                   Submit Test
                 </Button>
               ) : (
                 <Button
-                  onClick={() => goToQuestion(Math.min(questions.length - 1, currentIndex + 1))}
-                  disabled={currentIndex === questions.length - 1}
+                  onClick={() => goToQuestion(Math.min(questions.length - 1, safeIndex + 1))}
                   className="gap-2"
                 >
                   Next
@@ -520,7 +414,6 @@ export function TestEngine({
           <div className="lg:col-span-1">
             <Card className="border-border sticky top-20">
               <CardContent className="p-4">
-                {/* legend */}
                 <div className="grid grid-cols-2 gap-2 text-xs mb-4">
                   <div className="flex items-center gap-2">
                     <span className="h-4 w-4 rounded bg-slate-200"></span>
@@ -549,7 +442,7 @@ export function TestEngine({
                   visited={visitedQuestions}
                   review={markedForReview}
                   bookmarked={bookmarked}
-                  currentIndex={currentIndex}
+                  currentIndex={safeIndex}
                   goTo={goToQuestion}
                 />
 
@@ -560,9 +453,7 @@ export function TestEngine({
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Not Answered:</span>
-                    <span className="font-medium text-foreground">
-                      {questions.length - answeredCount}
-                    </span>
+                    <span className="font-medium text-foreground">{questions.length - answeredCount}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Marked for Review:</span>

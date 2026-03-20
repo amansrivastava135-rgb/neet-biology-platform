@@ -1623,3 +1623,73 @@ export function getQuestionsByChapter(chapterId: number): Question[] {
 export function getDemoQuestions(): Question[] {
   return sampleQuestions.slice(0, 10);
 }
+export function getQuestionSetsByChapter(chapterId: number): {
+  setNumber: number;
+  label: string;
+  questions: Question[];
+  type: "auto" | "manual";
+}[] {
+  // Load admin questions
+  let adminQuestions: Question[] = [];
+  try {
+    if (typeof window !== "undefined") {
+      const stored = window.localStorage.getItem("neet_admin_questions");
+      if (stored) adminQuestions = JSON.parse(stored);
+    }
+  } catch {}
+
+  // Merge admin + sample questions for this chapter
+  const allQuestions = [...adminQuestions, ...sampleQuestions].filter(
+    (q) => q.chapterId === chapterId
+  );
+
+  // Check for manually assigned sets
+  const manualSets: Record<number, Question[]> = {};
+  const autoQuestions: Question[] = [];
+
+  allQuestions.forEach((q: any) => {
+    if (q.setNumber) {
+      if (!manualSets[q.setNumber]) manualSets[q.setNumber] = [];
+      manualSets[q.setNumber].push(q);
+    } else {
+      autoQuestions.push(q);
+    }
+  });
+
+  const sets: { setNumber: number; label: string; questions: Question[]; type: "auto" | "manual" }[] = [];
+
+  // Add manual sets first
+  Object.entries(manualSets).forEach(([num, qs]) => {
+    sets.push({
+      setNumber: parseInt(num),
+      label: `Set ${num}`,
+      questions: qs,
+      type: "manual",
+    });
+  });
+
+  // Auto sets from remaining questions (90 per set)
+  const SET_SIZE = 90;
+  for (let i = 0; i < autoQuestions.length; i += SET_SIZE) {
+    const setNum = sets.length + 1;
+    sets.push({
+      setNumber: setNum,
+      label: `Set ${setNum}`,
+      questions: autoQuestions.slice(i, i + SET_SIZE),
+      type: "auto",
+    });
+  }
+
+  // PYQ Set
+  const pyqQuestions = allQuestions.filter((q) => q.source === "PYQ");
+  if (pyqQuestions.length > 0) {
+    sets.push({
+      setNumber: sets.length + 1,
+      label: "PYQ Set",
+      questions: pyqQuestions,
+      type: "auto",
+    });
+  }
+
+  return sets;
+}

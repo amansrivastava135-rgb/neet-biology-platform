@@ -1,5 +1,14 @@
 "use client";
-
+async function setJWTCookie(user: User) {
+  await fetch("/api/auth/login", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      email: user.email,
+      password: user.id === "3" ? "admin123" : user.id === "2" ? "paid123" : "demo123",
+    }),
+  });
+}
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 
 export type User = {
@@ -206,7 +215,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const userProgress = storedProgress ? JSON.parse(storedProgress) : EMPTY_PROGRESS;
       setProgress(userProgress);
       localStorage.setItem("neet_user", JSON.stringify(migrated));
-      document.cookie = `neet_user=${encodeURIComponent(JSON.stringify(migrated))}; path=/; max-age=${60 * 60 * 24 * 365}`;
+      await setJWTCookie(migrated);
       return true;
     }
 
@@ -219,7 +228,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const userProgress = storedProgress ? JSON.parse(storedProgress) : EMPTY_PROGRESS;
       setProgress(userProgress);
       localStorage.setItem("neet_user", JSON.stringify(migrated));
-      document.cookie = `neet_user=${encodeURIComponent(JSON.stringify(migrated))}; path=/; max-age=${60 * 60 * 24 * 365}`;
+      await setJWTCookie(migrated);
       return true;
     }
 
@@ -249,31 +258,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // New user always starts with empty progress
     setProgress(EMPTY_PROGRESS);
     localStorage.setItem("neet_user", JSON.stringify(newUser));
-    document.cookie = `neet_user=${encodeURIComponent(JSON.stringify(newUser))}; path=/; max-age=${60 * 60 * 24 * 365}`;
+    await setJWTCookie(newUser);
     return true;
   };
 
-  const logout = () => {
+  const logout = async () => {
     setUser(null);
     setProgress(EMPTY_PROGRESS);
     localStorage.removeItem("neet_user");
-    document.cookie = "neet_user=; path=/; max-age=0";
+    await fetch("/api/auth/logout", { method: "POST" });
   };
 
-  const updateUser = (u: User) => {
+  const updateUser = async (u: User) => {
     const migrated = migrateUser(u);
     setUser(migrated);
     localStorage.setItem("neet_user", JSON.stringify(migrated));
-    document.cookie = `neet_user=${encodeURIComponent(JSON.stringify(migrated))}; path=/; max-age=${60 * 60 * 24 * 365}`;
+    await setJWTCookie(migrated);
   };
 
-  const activateSubscription = (plan: string, days: number) => {
+  const activateSubscription = async (plan: string, days: number) => {
     if (!user) return;
     const updated = applySubscription(user, plan, days);
     const migrated = migrateUser(updated);
     setUser(migrated);
     localStorage.setItem("neet_user", JSON.stringify(migrated));
-    document.cookie = `neet_user=${encodeURIComponent(JSON.stringify(migrated))}; path=/; max-age=${60 * 60 * 24 * 365}`;
+    await setJWTCookie(migrated);
   };
 
   const updateProgress = (chapterId: number, isCorrect: boolean) => {

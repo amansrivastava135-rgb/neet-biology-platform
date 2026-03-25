@@ -8,10 +8,23 @@ import { AuthProvider, useAuth } from "@/lib/auth-context";
 import { PremiumGuard } from "@/components/premium-guard";
 import { isPremium } from "@/lib/checkPremium";
 import { DashboardStats } from "@/components/dashboard/dashboard-stats";
-import { ProgressChart } from "@/components/dashboard/progress-chart";
-import { WeakChapters } from "@/components/dashboard/weak-chapters";
+import dynamic from "next/dynamic";
+
+const ProgressChart = dynamic(
+  () => import("@/components/dashboard/progress-chart").then(m => m.ProgressChart),
+  { loading: () => <div className="h-48 animate-pulse bg-gray-100 rounded-lg" />, ssr: false }
+);
+
+const WeakChapters = dynamic(
+  () => import("@/components/dashboard/weak-chapters").then(m => m.WeakChapters),
+  { loading: () => <div className="h-48 animate-pulse bg-gray-100 rounded-lg" />, ssr: false }
+);
+
+const RecentActivity = dynamic(
+  () => import("@/components/dashboard/recent-activity").then(m => m.RecentActivity),
+  { loading: () => <div className="h-48 animate-pulse bg-gray-100 rounded-lg" />, ssr: false }
+);
 import { QuickActions } from "@/components/dashboard/quick-actions";
-import { RecentActivity } from "@/components/dashboard/recent-activity";
 import { ProgressCards } from "@/components/dashboard/progress-cards";
 import { getResults, summarize, TestResult } from "@/lib/analytics";
 import { type UserProgress } from "@/lib/auth-context";

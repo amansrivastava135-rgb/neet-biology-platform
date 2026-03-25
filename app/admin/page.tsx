@@ -10,6 +10,7 @@ import { AdminOverview } from "@/components/admin/admin-overview";
 import { QuestionManager } from "@/components/admin/question-manager";
 import { ChapterManager } from "@/components/admin/chapter-manager";
 import { StudentManager } from "@/components/admin/student-manager";
+import { MockTestManager } from "@/components/admin/mock-test-manager";
 import { Loader2, Shield } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
@@ -33,9 +34,7 @@ function AdminContent() {
     );
   }
 
-  if (!user) {
-    return null;
-  }
+  if (!user) return null;
 
   if (!user.isAdmin) {
     return (
@@ -66,16 +65,17 @@ function AdminContent() {
           <div className="mb-8">
             <h1 className="text-3xl font-bold text-foreground">Admin Panel</h1>
             <p className="text-muted-foreground mt-1">
-              Manage questions, chapters, students, and subscriptions
+              Manage questions, chapters, students, mock tests and subscriptions
             </p>
           </div>
 
           <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="grid w-full max-w-2xl grid-cols-4 mb-8">
+            <TabsList className="grid w-full max-w-3xl grid-cols-5 mb-8">
               <TabsTrigger value="overview">Overview</TabsTrigger>
               <TabsTrigger value="questions">Questions</TabsTrigger>
               <TabsTrigger value="chapters">Chapters</TabsTrigger>
               <TabsTrigger value="students">Students</TabsTrigger>
+              <TabsTrigger value="mocktests">Mock Tests</TabsTrigger>
             </TabsList>
 
             <TabsContent value="overview">
@@ -89,6 +89,9 @@ function AdminContent() {
             </TabsContent>
             <TabsContent value="students">
               <StudentManager />
+            </TabsContent>
+            <TabsContent value="mocktests">
+              <MockTestManager />
             </TabsContent>
           </Tabs>
         </div>

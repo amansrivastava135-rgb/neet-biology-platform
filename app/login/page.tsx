@@ -12,11 +12,11 @@ import { BookOpen, Loader2, AlertCircle } from "lucide-react";
 import { useAuth, AuthProvider } from "@/lib/auth-context";
 
 function LoginForm() {
+  const { login } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const { login } = useAuth();
   const router = useRouter();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -27,15 +27,10 @@ function LoginForm() {
     try {
       const success = await login(email, password);
       if (success) {
-        // Admin ko /admin pe, baaki ko /dashboard pe bhejo
         const storedUser = localStorage.getItem("neet_user");
-        if (storedUser) {
-          const user = JSON.parse(storedUser);
-          if (user.isAdmin) {
-            router.push("/admin");
-          } else {
-            router.push("/dashboard");
-          }
+        const loggedInUser = storedUser ? JSON.parse(storedUser) : null;
+        if (loggedInUser?.isAdmin) {
+          router.push("/admin");
         } else {
           router.push("/dashboard");
         }

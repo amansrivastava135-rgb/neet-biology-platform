@@ -1,18 +1,17 @@
 import { NextRequest } from "next/server";
-import { isPremium } from "@/lib/checkPremium";
+import { jwtVerify } from "jose";
+import { COOKIE_NAME } from "@/lib/auth";
 
-export function getUserFromRequest(req: NextRequest) {
-  const cookieValue = req.cookies.get("neet_user")?.value;
-  if (!cookieValue) return null;
+const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET!);
+
+export async function premiumGuard(req: NextRequest): Promise<boolean> {
+  const token = req.cookies.get(COOKIE_NAME)?.value;
+  if (!token) return false;
 
   try {
-    return JSON.parse(decodeURIComponent(cookieValue));
+    const { payload } = await jwtVerify(token, JWT_SECRET);
+    return payload.isPremium === true;
   } catch {
-    return null;
+    return false;
   }
-}
-
-export function premiumGuard(req: NextRequest): boolean {
-  const user = getUserFromRequest(req);
-  return isPremium(user);
 }

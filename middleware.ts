@@ -1,44 +1,39 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { jwtVerify } from "jose";
 import { premiumGuard } from "@/middleware/premiumGuard";
 
 const premiumRoutes = ["/dashboard", "/analytics"];
 const adminRoutes = ["/admin"];
 
-export function middleware(req: NextRequest) {
+export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
   // Admin route protection
   if (adminRoutes.some((route) => pathname.startsWith(route))) {
-    const userCookie = req.cookies.get("neet_user");
+    const token = req.cookies.get("neet_token")?.value;
 
-    if (!userCookie) {
-      const redirectUrl = req.nextUrl.clone();
-      redirectUrl.pathname = "/login";
-      return NextResponse.redirect(redirectUrl);
+    if (!token) {
+      return NextResponse.redirect(new URL("/login", req.url));
     }
 
     try {
-      const user = JSON.parse(decodeURIComponent(userCookie.value));
-      if (!user.isAdmin) {
-        const redirectUrl = req.nextUrl.clone();
-        redirectUrl.pathname = "/dashboard";
-        return NextResponse.redirect(redirectUrl);
+      const secret = new TextEncoder().encode(process.env.JWT_SECRET);
+      const { payload } = await jwtVerify(token, secret);
+
+      if (!payload.isAdmin) {
+        return NextResponse.redirect(new URL("/dashboard", req.url));
       }
-      // Admin valid — seedha jaane do
+
       return NextResponse.next();
     } catch {
-      const redirectUrl = req.nextUrl.clone();
-      redirectUrl.pathname = "/login";
-      return NextResponse.redirect(redirectUrl);
+      return NextResponse.redirect(new URL("/login", req.url));
     }
   }
 
   // Premium route protection
   if (premiumRoutes.some((route) => pathname.startsWith(route))) {
     if (!premiumGuard(req)) {
-      const redirectUrl = req.nextUrl.clone();
-      redirectUrl.pathname = "/pricing";
-      return NextResponse.redirect(redirectUrl);
+      return NextResponse.redirect(new URL("/pricing", req.url));
     }
   }
 

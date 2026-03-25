@@ -57,6 +57,11 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
+      <head>
+        <link rel="manifest" href="/manifest.json" />
+        <meta name="theme-color" content="#166534" />
+        <link rel="apple-touch-icon" href="/apple-icon.png" />
+      </head>
       <body className={`${inter.variable} ${merriweather.variable} font-sans antialiased`}>
         {children}
         <Analytics />

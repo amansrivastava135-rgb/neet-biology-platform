@@ -8,7 +8,8 @@ type MockTestInterfaceProps = {
   testType: "full" | "preview";
   onSubmit: (payload: TestSubmitPayload) => void;
   isPaidUser: boolean;
-  mockTestId?: string; // For manual mock tests
+  mockTestId?: string;
+  autoTestIndex?: number;
 };
 
 function shuffleArray<T>(array: T[]): T[] {

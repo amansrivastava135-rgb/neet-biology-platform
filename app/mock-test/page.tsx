@@ -7,6 +7,7 @@ import { AuthProvider, useAuth } from "@/lib/auth-context";
 import { MockTestSelector } from "@/components/mock-test/mock-test-selector";
 import { MockTestInterface } from "@/components/mock-test/mock-test-interface";
 import { MockTestResult } from "@/components/mock-test/mock-test-result";
+import { ErrorBoundary } from "@/components/error-boundary";
 import { type Question } from "@/lib/data";
 
 export type MockTestState = "selection" | "test" | "result";
@@ -40,7 +41,6 @@ function MockTestContentWrapper({ onTestStateChange }: { onTestStateChange: (inT
     setTestState("test");
     onTestStateChange(true);
 
-    // Set label
     if (manualTestId) {
       setTestLabel("Custom Mock Test");
     } else if (autoIndex !== undefined) {
@@ -70,13 +70,25 @@ function MockTestContentWrapper({ onTestStateChange }: { onTestStateChange: (inT
         <MockTestSelector onStartTest={handleStartTest} isPaidUser={isPaid} />
       )}
       {testState === "test" && (
-        <MockTestInterface
-          testType={testType}
-          onSubmit={handleSubmitTest}
-          isPaidUser={isPaid}
-          mockTestId={mockTestId}
-          autoTestIndex={autoTestIndex}
-        />
+        <ErrorBoundary fallback={
+          <div className="p-8 text-center">
+            <p className="text-red-500 font-medium">Test failed to load!</p>
+            <button
+              className="mt-3 text-sm text-primary underline"
+              onClick={handleRetakeTest}
+            >
+              Go back
+            </button>
+          </div>
+        }>
+          <MockTestInterface
+            testType={testType}
+            onSubmit={handleSubmitTest}
+            isPaidUser={isPaid}
+            mockTestId={mockTestId}
+            autoTestIndex={autoTestIndex}
+          />
+        </ErrorBoundary>
       )}
       {testState === "result" && resultData && (
         <MockTestResult

@@ -140,7 +140,6 @@ export function TestEngine({
   const answersRef = useRef(answers);
   const questionsRef = useRef(questions);
 
-  // Safety check — if no questions, show empty state
   if (!questions || questions.length === 0) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -341,10 +340,13 @@ export function TestEngine({
                   {currentQuestion?.question || ""}
                 </h2>
 
-                <div className="space-y-3 mb-6">
+                <div role="radiogroup" aria-label="Answer options" className="space-y-3 mb-6">
                   {currentQuestion && Object.entries(currentQuestion.options).map(([key, value]) => (
                     <button
                       key={key}
+                      role="radio"
+                      aria-checked={currentAnswer === key}
+                      aria-label={`Option ${key}: ${value}`}
                       className={`w-full p-4 text-left rounded-lg border transition-all flex items-start gap-3 ${
                         currentAnswer === key
                           ? "border-primary bg-primary/10"

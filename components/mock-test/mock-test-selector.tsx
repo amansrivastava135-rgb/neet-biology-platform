@@ -9,6 +9,7 @@ import Link from "next/link";
 import { getRemainingDays } from "@/lib/subscription-utils";
 import { useAuth } from "@/lib/auth-context";
 import { sampleQuestions, class11Chapters, class12Chapters } from "@/lib/data";
+import { LeaderboardTable } from "@/components/leaderboard/LeaderboardTable";
 
 const QUESTIONS_PER_TEST = 90;
 
@@ -254,6 +255,20 @@ export function MockTestSelector({ onStartTest, isPaidUser }: MockTestSelectorPr
           </ul>
         </CardContent>
       </Card>
+      {isPaidUser && (
+  <div className="max-w-4xl mx-auto mt-8">
+    <div className="flex items-center justify-between mb-4">
+      <h2 className="text-xl font-bold text-foreground flex items-center gap-2">
+        🏆 Leaderboard
+      </h2>
+    </div>
+    <Card className="border-border">
+      <CardContent className="pt-6">
+        <LeaderboardTable />
+      </CardContent>
+    </Card>
+  </div>
+)}
     </div>
   );
 }

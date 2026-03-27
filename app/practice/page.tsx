@@ -29,34 +29,66 @@ function getQuestionsForSet(chapterId: number, setNumber: number): Question[] {
     (q) => q.chapterId === chapterId
   );
 
-  // Manual set questions
   const manualSetQuestions = allQuestions.filter((q: any) => q.setNumber === setNumber);
   if (manualSetQuestions.length > 0) return manualSetQuestions;
 
-  // Separate PYQ and NCERT questions — NO overlap
   const ncertQuestions = allQuestions.filter((q: any) => !q.setNumber && q.source === "NCERT");
   const pyqQuestions = allQuestions.filter((q: any) => !q.setNumber && q.source === "PYQ");
 
   const totalNcertSets = Math.ceil(ncertQuestions.length / SET_SIZE);
 
-  // PYQ Set is always the LAST set
   if (setNumber === totalNcertSets + 1) {
     return pyqQuestions.slice(0, SET_SIZE);
   }
 
-  // NCERT auto sets — no overlap
   const start = (setNumber - 1) * SET_SIZE;
   const result = ncertQuestions.slice(start, start + SET_SIZE);
-  
-  // If no NCERT questions, fallback to all questions for this set
+
   if (result.length === 0) {
     const allAutoQuestions = allQuestions.filter((q: any) => !q.setNumber);
     const fallbackStart = (setNumber - 1) * SET_SIZE;
     return allAutoQuestions.slice(fallbackStart, fallbackStart + SET_SIZE);
   }
-  
+
   return result;
 }
+
+// Get all PYQ questions for a specific year across all chapters
+function getPYQQuestionsByYear(year: number): Question[] {
+  let adminQuestions: Question[] = [];
+  try {
+    if (typeof window !== "undefined") {
+      const stored = window.localStorage.getItem("neet_admin_questions");
+      if (stored) adminQuestions = JSON.parse(stored);
+    }
+  } catch {}
+
+  return [...adminQuestions, ...sampleQuestions].filter(
+    (q) => q.source === "PYQ" && q.year === year
+  );
+}
+
+// Get all PYQ questions for a specific chapter
+function getPYQQuestionsByChapter(chapterId: number): Question[] {
+  let adminQuestions: Question[] = [];
+  try {
+    if (typeof window !== "undefined") {
+      const stored = window.localStorage.getItem("neet_admin_questions");
+      if (stored) adminQuestions = JSON.parse(stored);
+    }
+  } catch {}
+
+  return [...adminQuestions, ...sampleQuestions].filter(
+    (q) => q.source === "PYQ" && q.chapterId === chapterId
+  );
+}
+
+type PracticeMode =
+  | { type: "none" }
+  | { type: "demo" }
+  | { type: "chapter"; chapterId: number; setNumber: number }
+  | { type: "pyq-year"; year: number }
+  | { type: "pyq-chapter"; chapterId: number };
 
 function PracticeContent() {
   const { user } = useAuth();
@@ -64,8 +96,9 @@ function PracticeContent() {
   const searchParams = useSearchParams();
   const isDemoParam = searchParams.get("demo") === "true";
 
-  const [selectedChapter, setSelectedChapter] = useState<number | null>(null);
-  const [selectedSet, setSelectedSet] = useState<number | null>(null);
+  const [mode, setMode] = useState<PracticeMode>(
+    isDemoParam ? { type: "demo" } : { type: "none" }
+  );
   const [showResult, setShowResult] = useState(false);
   const [resultData, setResultData] = useState<{
     questions: Question[];
@@ -73,30 +106,68 @@ function PracticeContent() {
     timeTaken: number;
   } | null>(null);
 
-  const showingDemo = isDemoParam || (!user && selectedChapter === null);
-
-  const questions = useMemo(() => {
-    if (showingDemo) return getDemoQuestions();
-    if (selectedChapter && selectedSet !== null) {
-      const qs = getQuestionsForSet(selectedChapter, selectedSet);
-      if (!isPaid && qs.length > 3) return qs.slice(0, 3);
-      return qs;
+  const { questions, storageKey, testLabel, testType } = useMemo(() => {
+    if (mode.type === "none") {
+      return { questions: [], storageKey: "", testLabel: "", testType: "practice" };
     }
-    return [];
-  }, [selectedChapter, selectedSet, showingDemo, isPaid]);
 
-  const totalTime = showingDemo ? 10 * 60 : questions.length > 0 ? questions.length * 60 : 0;
-  const storageKey = showingDemo
-    ? "neet-practice-demo"
-    : `neet-practice-chapter-${selectedChapter}-set-${selectedSet}`;
-  const testLabel = showingDemo
-    ? "Demo Practice"
-    : `Chapter ${selectedChapter} — Set ${selectedSet}`;
-  const testType = showingDemo ? "preview" : "practice";
+    if (mode.type === "demo") {
+      return {
+        questions: getDemoQuestions(),
+        storageKey: "neet-practice-demo",
+        testLabel: "Demo Practice",
+        testType: "preview",
+      };
+    }
+
+    if (mode.type === "chapter") {
+      const qs = getQuestionsForSet(mode.chapterId, mode.setNumber);
+      const limited = !isPaid && qs.length > 3 ? qs.slice(0, 3) : qs;
+      return {
+        questions: limited,
+        storageKey: `neet-practice-chapter-${mode.chapterId}-set-${mode.setNumber}`,
+        testLabel: `Chapter ${mode.chapterId} — Set ${mode.setNumber}`,
+        testType: "practice",
+      };
+    }
+
+    if (mode.type === "pyq-year") {
+      const qs = getPYQQuestionsByYear(mode.year);
+      return {
+        questions: qs,
+        storageKey: `neet-practice-pyq-year-${mode.year}`,
+        testLabel: `NEET ${mode.year} — Biology PYQ`,
+        testType: "practice",
+      };
+    }
+
+    if (mode.type === "pyq-chapter") {
+      const qs = getPYQQuestionsByChapter(mode.chapterId);
+      return {
+        questions: qs,
+        storageKey: `neet-practice-pyq-chapter-${mode.chapterId}`,
+        testLabel: `Chapter ${mode.chapterId} — PYQ Practice`,
+        testType: "practice",
+      };
+    }
+
+    return { questions: [], storageKey: "", testLabel: "", testType: "practice" };
+  }, [mode, isPaid]);
+
+  const totalTime = questions.length > 0 ? questions.length * 60 : 0;
 
   const handleStartChapter = (chapterId: number, setNumber?: number) => {
-    setSelectedChapter(chapterId);
-    setSelectedSet(setNumber ?? 1);
+    setMode({ type: "chapter", chapterId, setNumber: setNumber ?? 1 });
+    setShowResult(false);
+  };
+
+  const handleStartPYQYear = (year: number) => {
+    setMode({ type: "pyq-year", year });
+    setShowResult(false);
+  };
+
+  const handleStartPYQChapter = (chapterId: number) => {
+    setMode({ type: "pyq-chapter", chapterId });
     setShowResult(false);
   };
 
@@ -109,24 +180,20 @@ function PracticeContent() {
     setShowResult(true);
   };
 
-  const handleRetake = () => {
-    setShowResult(false);
-  };
+  const handleRetake = () => setShowResult(false);
 
   const handleBackToChapters = () => {
-    setSelectedChapter(null);
-    setSelectedSet(null);
+    setMode({ type: "none" });
     setShowResult(false);
   };
 
-  if (!selectedChapter && !showingDemo) {
+  if (mode.type === "none") {
     return (
       <ChapterSelector
         onSelectChapter={handleStartChapter}
+        onStartPYQYear={handleStartPYQYear}
+        onStartPYQChapter={handleStartPYQChapter}
         onStartDemo={() => {
-          setSelectedChapter(null);
-          setSelectedSet(null);
-          setShowResult(false);
           const url = new URL(window.location.href);
           url.searchParams.set("demo", "true");
           window.location.href = url.toString();

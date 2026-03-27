@@ -3,10 +3,7 @@ async function setJWTCookie(user: User) {
   await fetch("/api/auth/login", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      email: user.email,
-      password: user.id === "3" ? "admin123" : user.id === "2" ? "paid123" : "demo123",
-    }),
+    body: JSON.stringify({ user }),
   });
 }
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";

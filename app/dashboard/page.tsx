@@ -166,7 +166,7 @@ function DashboardContent() {
     </div>
   );
 }
-
+ 
 export default function DashboardPage() {
   return (
     <AuthProvider>

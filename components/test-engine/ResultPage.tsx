@@ -5,6 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { type Question } from "@/lib/data";
+import { LeaderboardTable } from "@/components/leaderboard/LeaderboardTable";
+import { supabase } from "@/lib/supabase";
 import {
   CheckCircle,
   XCircle,
@@ -120,7 +122,26 @@ export function ResultPage({
       topicPerformance,
     };
     saveResult(result);
-
+     // Save result to Supabase (only for full mock tests)
+    if (testType === "full") {
+     const storedUser = localStorage.getItem("neet_user");
+    if (storedUser) {
+     const userData = JSON.parse(storedUser);
+     supabase.from("mock_test_results").insert({
+      user_id: userData.id,
+      user_name: userData.name,
+      test_id: testLabel || testType,
+      score: score,
+      accuracy: accuracy,
+      time_taken: timeTaken,
+      correct_answers: correctCount,
+      wrong_answers: incorrectCount,
+      unattempted: unattemptedCount,
+      }).then(({ error }) => {
+      if (error) console.error("Leaderboard save error:", JSON.stringify(error), error.message, error.details, error.hint);
+      });
+     }
+    }
     // Save progress per user
     try {
       const storedUser = localStorage.getItem("neet_user");
@@ -348,6 +369,20 @@ export function ResultPage({
             </div>
           </CardContent>
         </Card>
+
+        {(testType === "full" || testType === "preview") && (
+  <Card className="border-border mb-8">
+    <CardHeader>
+      <CardTitle className="text-lg flex items-center gap-2">
+        <Trophy className="h-5 w-5 text-yellow-500" />
+        Leaderboard
+      </CardTitle>
+    </CardHeader>
+    <CardContent>
+      <LeaderboardTable testId={testType} />
+    </CardContent>
+  </Card>
+)}
 
         <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
           <Button variant="outline" asChild className="gap-2 w-full sm:w-auto">

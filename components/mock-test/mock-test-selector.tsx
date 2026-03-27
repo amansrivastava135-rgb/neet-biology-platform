@@ -8,7 +8,7 @@ import { Clock, FileQuestion, Lock, Play, Sparkles, Target } from "lucide-react"
 import Link from "next/link";
 import { getRemainingDays } from "@/lib/subscription-utils";
 import { useAuth } from "@/lib/auth-context";
-import { sampleQuestions, class11Chapters, class12Chapters } from "@/lib/data";
+import { sampleQuestions } from "@/lib/data";
 import { LeaderboardTable } from "@/components/leaderboard/LeaderboardTable";
 
 const QUESTIONS_PER_TEST = 90;
@@ -71,13 +71,10 @@ export function MockTestSelector({ onStartTest, isPaidUser }: MockTestSelectorPr
   const [autoTests, setAutoTests] = useState<AutoMockTest[]>([]);
 
   useEffect(() => {
-    // Load manual tests
     try {
       const stored = localStorage.getItem("neet_manual_mock_tests");
       if (stored) setManualTests(JSON.parse(stored));
     } catch {}
-
-    // Generate auto tests based on available questions
     setAutoTests(generateAutoMockTests());
   }, []);
 
@@ -100,34 +97,36 @@ export function MockTestSelector({ onStartTest, isPaidUser }: MockTestSelectorPr
         )}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto mb-10">
-        {/* Demo Test */}
-        <Card className="border-primary/50 bg-primary/5">
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <Badge variant="secondary">Free Preview</Badge>
-              <Sparkles className="h-5 w-5 text-primary" />
-            </div>
-            <CardTitle className="text-xl mt-4">Demo Mock Test</CardTitle>
-            <CardDescription>Get a taste of the NEET exam experience</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-2 gap-4 text-sm">
-              <div className="flex items-center gap-2 text-muted-foreground">
-                <FileQuestion className="h-4 w-4" />
-                <span>10 Questions</span>
+      {/* Top Cards — Demo only for free users */}
+      <div className={`grid grid-cols-1 ${!isPaidUser ? 'md:grid-cols-2' : 'md:grid-cols-1'} gap-6 max-w-4xl mx-auto mb-10`}>
+        {!isPaidUser && (
+          <Card className="border-primary/50 bg-primary/5">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <Badge variant="secondary">Free Preview</Badge>
+                <Sparkles className="h-5 w-5 text-primary" />
               </div>
-              <div className="flex items-center gap-2 text-muted-foreground">
-                <Clock className="h-4 w-4" />
-                <span>10 Minutes</span>
+              <CardTitle className="text-xl mt-4">Demo Mock Test</CardTitle>
+              <CardDescription>Get a taste of the NEET exam experience</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <FileQuestion className="h-4 w-4" />
+                  <span>10 Questions</span>
+                </div>
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <Clock className="h-4 w-4" />
+                  <span>10 Minutes</span>
+                </div>
               </div>
-            </div>
-            <Button className="w-full gap-2" onClick={() => onStartTest("preview")}>
-              <Play className="h-4 w-4" />
-              Start Demo Test
-            </Button>
-          </CardContent>
-        </Card>
+              <Button className="w-full gap-2" onClick={() => onStartTest("preview")}>
+                <Play className="h-4 w-4" />
+                Start Demo Test
+              </Button>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Info Card */}
         <Card className="border-border bg-muted/30">
@@ -139,8 +138,7 @@ export function MockTestSelector({ onStartTest, isPaidUser }: MockTestSelectorPr
             <p>✅ Each test has <strong>90 questions</strong></p>
             <p>✅ <strong>50% Class 11</strong> + <strong>50% Class 12</strong></p>
             <p>✅ Questions from <strong>all 38 chapters</strong></p>
-            <p>✅ New mock test auto-created after every 90 questions added</p>
-            <p>✅ <strong>90 minutes</strong> per test</p>
+            <p>✅ <strong>90 minutes</strong> per Test</p>
           </CardContent>
         </Card>
       </div>
@@ -255,20 +253,22 @@ export function MockTestSelector({ onStartTest, isPaidUser }: MockTestSelectorPr
           </ul>
         </CardContent>
       </Card>
+
+      {/* Leaderboard — only for premium users */}
       {isPaidUser && (
-  <div className="max-w-4xl mx-auto mt-8">
-    <div className="flex items-center justify-between mb-4">
-      <h2 className="text-xl font-bold text-foreground flex items-center gap-2">
-        🏆 Leaderboard
-      </h2>
-    </div>
-    <Card className="border-border">
-      <CardContent className="pt-6">
-        <LeaderboardTable />
-      </CardContent>
-    </Card>
-  </div>
-)}
+        <div className="max-w-4xl mx-auto mt-8">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-bold text-foreground flex items-center gap-2">
+              🏆 Leaderboard
+            </h2>
+          </div>
+          <Card className="border-border">
+            <CardContent className="pt-6">
+              <LeaderboardTable />
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </div>
   );
 }

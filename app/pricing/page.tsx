@@ -155,47 +155,6 @@ function PricingContent() {
             />
           </div>
 
-          {/* Premium Plan Details */}
-          <Card className="border-primary shadow-lg relative mb-16">
-            <Badge className="absolute -top-3 left-1/2 -translate-x-1/2">
-              Most Popular
-            </Badge>
-            <CardHeader className="text-center pb-4">
-              <CardTitle className="text-2xl">Premium</CardTitle>
-              <CardDescription>{PRICING.premium.description}</CardDescription>
-              <div className="mt-4">
-                <span className="text-4xl font-bold text-foreground">₹{PRICING.premium.price}</span>
-                <span className="block text-sm text-muted-foreground mt-1">{PRICING.premium.label}</span>
-              </div>
-              <p className="text-sm text-muted-foreground mt-2">
-                {PRICING.premium.displayText}
-              </p>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <ul className="space-y-3">
-                {features.filter(f => f.premium).map((feature) => (
-                  <li key={feature.name} className="flex items-center gap-3">
-                    <Check className="h-5 w-5 text-primary flex-shrink-0" />
-                    <span className="text-foreground">{feature.name}</span>
-                  </li>
-                ))}
-              </ul>
-              {isPaid ? (
-                <Button className="w-full" disabled>
-                  Already Subscribed
-                </Button>
-              ) : user ? (
-                <Button className="w-full" onClick={handleBuy} disabled={loading}>
-                  {loading ? "Processing..." : `Buy Now for ₹${PRICING.premium.price}`}
-                </Button>
-              ) : (
-                <Button className="w-full" asChild>
-                  <Link href="/signup">Get Started</Link>
-                </Button>
-              )}
-            </CardContent>
-          </Card>
-
           {/* Features Section */}
           <div className="mb-16">
             <h2 className="text-2xl font-bold text-foreground text-center mb-8">

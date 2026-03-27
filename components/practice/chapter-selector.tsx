@@ -354,6 +354,7 @@ export function ChapterSelector({ onSelectChapter, onStartDemo, isPaidUser }: Ch
       </div>
 
       {/* Demo Section */}
+      {!isPaidUser && (
       <Card className="mb-8 border-primary/50 bg-primary/5">
         <CardContent className="py-6">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
@@ -375,7 +376,8 @@ export function ChapterSelector({ onSelectChapter, onStartDemo, isPaidUser }: Ch
           </div>
         </CardContent>
       </Card>
-
+      )}
+      
       {/* Set Selector Modal */}
       {selectedChapter && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">

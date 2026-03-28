@@ -1,4 +1,5 @@
 "use client";
+
 async function setJWTCookie(user: User) {
   await fetch("/api/auth/login", {
     method: "POST",
@@ -6,6 +7,7 @@ async function setJWTCookie(user: User) {
     body: JSON.stringify({ user }),
   });
 }
+
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 
 export type User = {
@@ -21,15 +23,7 @@ export type User = {
   expiryDate?: string;
   subscription_start?: string;
   subscription_end?: string;
-  devices?: string[];
-  activeTestSession?: {
-    sessionId: string;
-    startTime: string;
-    deviceId: string;
-  };
   isAdmin: boolean;
-  subscribedAt?: Date;
-  expiresAt?: Date;
 };
 
 export type UserProgress = {
@@ -58,59 +52,6 @@ const EMPTY_PROGRESS: UserProgress = {
   chapterProgress: {},
 };
 
-function migrateUser(u: User): User {
-  const migrated = { ...u } as User;
-  if (migrated.subscriptionPlan === undefined) {
-    migrated.subscriptionPlan = migrated.plan === "premium" ? "premium" : migrated.isPaid ? "premium" : "free";
-  }
-  if (migrated.subscription === undefined) {
-    migrated.subscription = migrated.isPaid ? "active" : "free";
-  }
-  if (migrated.expiryDate === undefined && migrated.expiresAt) {
-    migrated.expiryDate = (migrated.expiresAt as Date).toISOString();
-  }
-  if (!migrated.subscriptionStart && migrated.subscription_start) {
-    migrated.subscriptionStart = migrated.subscription_start;
-  }
-  if (!migrated.subscriptionEnd && migrated.subscription_end) {
-    migrated.subscriptionEnd = migrated.subscription_end;
-  }
-  if (!migrated.subscriptionEnd && migrated.expiryDate) {
-    migrated.subscriptionEnd = migrated.expiryDate;
-  }
-  const now = new Date();
-  if (migrated.subscriptionEnd) {
-    const endDate = new Date(migrated.subscriptionEnd);
-    if (now.getTime() > endDate.getTime()) {
-      migrated.subscriptionPlan = "free";
-      migrated.subscription = "expired";
-      migrated.isPaid = false;
-      return migrated;
-    }
-  }
-  migrated.isPaid = (migrated.subscriptionPlan === "premium" && migrated.subscriptionEnd ? new Date(migrated.subscriptionEnd).getTime() > Date.now() : false);
-  return migrated;
-}
-
-function applySubscription(u: User, plan: string, days: number): User {
-  const now = new Date();
-  const expiry = new Date(now.getTime() + days * 24 * 60 * 60 * 1000);
-  return {
-    ...u,
-    subscriptionPlan: "premium",
-    subscriptionStart: now.toISOString(),
-    subscriptionEnd: expiry.toISOString(),
-    subscription: "active",
-    plan,
-    subscription_start: now.toISOString(),
-    subscription_end: expiry.toISOString(),
-    expiryDate: expiry.toISOString(),
-    isPaid: true,
-    subscribedAt: now,
-  };
-}
-
-// Per-user progress key
 function progressKey(userId: string) {
   return `neet_progress_${userId}`;
 }
@@ -124,6 +65,8 @@ const DEMO_USERS: Record<string, { password: string; user: User }> = {
       name: "Demo User",
       isPaid: false,
       isAdmin: false,
+      subscription: "free",
+      subscriptionPlan: "free",
     },
   },
   "paid@example.com": {
@@ -134,10 +77,8 @@ const DEMO_USERS: Record<string, { password: string; user: User }> = {
       name: "Paid User",
       isPaid: true,
       isAdmin: false,
-      subscribedAt: new Date(),
-      expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-      subscriptionPlan: "premium" as const,
-      subscription: "active" as const,
+      subscriptionPlan: "premium",
+      subscription: "active",
       subscriptionEnd: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
     },
   },
@@ -149,12 +90,26 @@ const DEMO_USERS: Record<string, { password: string; user: User }> = {
       name: "Admin",
       isPaid: true,
       isAdmin: true,
-      subscriptionPlan: "premium" as const,
-      subscription: "active" as const,
+      subscriptionPlan: "premium",
+      subscription: "active",
       subscriptionEnd: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
     },
   },
 };
+
+function applySubscription(u: User, plan: string, days: number): User {
+  const now = new Date();
+  const expiry = new Date(now.getTime() + days * 24 * 60 * 60 * 1000);
+  return {
+    ...u,
+    subscriptionPlan: "premium",
+    subscriptionStart: now.toISOString(),
+    subscriptionEnd: expiry.toISOString(),
+    subscription: "active",
+    plan,
+    isPaid: true,
+  };
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -162,32 +117,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const endString = user?.subscriptionEnd || user?.subscription_end || user?.expiryDate;
-    if (user && endString) {
-      const nowPaid = new Date(endString).getTime() > Date.now();
-      if (user.isPaid !== nowPaid) {
-        const updated: User = {
-          ...user,
-          isPaid: nowPaid,
-          subscriptionPlan: nowPaid ? "premium" : "free",
-          subscription: nowPaid ? "active" : "free",
-        };
-        setUser(updated);
-        localStorage.setItem("neet_user", JSON.stringify(updated));
-        document.cookie = `neet_user=${encodeURIComponent(JSON.stringify(updated))}; path=/; max-age=${60 * 60 * 24 * 365}`;
-      }
-    }
-  }, [user]);
-
-  useEffect(() => {
     const storedUser = localStorage.getItem("neet_user");
     if (storedUser) {
       try {
         const parsed: User = JSON.parse(storedUser);
-        const migrated = migrateUser(parsed);
-        setUser(migrated);
-        // Load this user's own progress
-        const storedProgress = localStorage.getItem(progressKey(migrated.id));
+        setUser(parsed);
+        const storedProgress = localStorage.getItem(progressKey(parsed.id));
         if (storedProgress) {
           setProgress(JSON.parse(storedProgress));
         } else {
@@ -201,31 +136,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const login = async (email: string, password: string): Promise<boolean> => {
-    await new Promise((resolve) => setTimeout(resolve, 500));
-
+    // Demo users check
     const demoUser = DEMO_USERS[email];
     if (demoUser && demoUser.password === password) {
-      const migrated = migrateUser(demoUser.user);
-      setUser(migrated);
-      // Load this user's own progress
-      const storedProgress = localStorage.getItem(progressKey(migrated.id));
-      const userProgress = storedProgress ? JSON.parse(storedProgress) : EMPTY_PROGRESS;
-      setProgress(userProgress);
-      localStorage.setItem("neet_user", JSON.stringify(migrated));
-      await setJWTCookie(migrated);
+      setUser(demoUser.user);
+      const storedProgress = localStorage.getItem(progressKey(demoUser.user.id));
+      setProgress(storedProgress ? JSON.parse(storedProgress) : EMPTY_PROGRESS);
+      localStorage.setItem("neet_user", JSON.stringify(demoUser.user));
+      await setJWTCookie(demoUser.user);
       return true;
     }
 
-    const registeredUsers = JSON.parse(localStorage.getItem("neet_registered_users") || "{}");
-    if (registeredUsers[email] && registeredUsers[email].password === password) {
-      const migrated = migrateUser(registeredUsers[email].user);
-      setUser(migrated);
-      // Load this user's own progress
-      const storedProgress = localStorage.getItem(progressKey(migrated.id));
-      const userProgress = storedProgress ? JSON.parse(storedProgress) : EMPTY_PROGRESS;
-      setProgress(userProgress);
-      localStorage.setItem("neet_user", JSON.stringify(migrated));
-      await setJWTCookie(migrated);
+    // Supabase se login
+    const res = await fetch("/api/auth/login-user", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password }),
+    });
+
+    if (!res.ok) return false;
+
+    const data = await res.json();
+    if (data.success && data.user) {
+      setUser(data.user);
+      const storedProgress = localStorage.getItem(progressKey(data.user.id));
+      setProgress(storedProgress ? JSON.parse(storedProgress) : EMPTY_PROGRESS);
+      localStorage.setItem("neet_user", JSON.stringify(data.user));
       return true;
     }
 
@@ -233,30 +169,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signup = async (email: string, password: string, name: string): Promise<boolean> => {
-    await new Promise((resolve) => setTimeout(resolve, 500));
-
+    // Demo users check
     if (DEMO_USERS[email]) return false;
 
-    const registeredUsers = JSON.parse(localStorage.getItem("neet_registered_users") || "{}");
-    if (registeredUsers[email]) return false;
+    // Supabase mein signup
+    const res = await fetch("/api/auth/signup", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password, name }),
+    });
 
-    const newUser: User = {
-      id: Date.now().toString(),
-      email,
-      name,
-      isPaid: false,
-      isAdmin: false,
-      subscription: "free",
-    };
+    if (!res.ok) return false;
 
-    registeredUsers[email] = { password, user: newUser };
-    localStorage.setItem("neet_registered_users", JSON.stringify(registeredUsers));
-    setUser(newUser);
-    // New user always starts with empty progress
-    setProgress(EMPTY_PROGRESS);
-    localStorage.setItem("neet_user", JSON.stringify(newUser));
-    await setJWTCookie(newUser);
-    return true;
+    const data = await res.json();
+    if (data.success && data.user) {
+      const newUser: User = {
+        id: data.user.id,
+        email: data.user.email,
+        name: data.user.name,
+        isPaid: false,
+        isAdmin: false,
+        subscription: "free",
+        subscriptionPlan: "free",
+      };
+      setUser(newUser);
+      setProgress(EMPTY_PROGRESS);
+      localStorage.setItem("neet_user", JSON.stringify(newUser));
+      await setJWTCookie(newUser);
+      return true;
+    }
+
+    return false;
   };
 
   const logout = async () => {
@@ -267,19 +210,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const updateUser = async (u: User) => {
-    const migrated = migrateUser(u);
-    setUser(migrated);
-    localStorage.setItem("neet_user", JSON.stringify(migrated));
-    await setJWTCookie(migrated);
+    setUser(u);
+    localStorage.setItem("neet_user", JSON.stringify(u));
+    await setJWTCookie(u);
   };
 
   const activateSubscription = async (plan: string, days: number) => {
     if (!user) return;
     const updated = applySubscription(user, plan, days);
-    const migrated = migrateUser(updated);
-    setUser(migrated);
-    localStorage.setItem("neet_user", JSON.stringify(migrated));
-    await setJWTCookie(migrated);
+    setUser(updated);
+    localStorage.setItem("neet_user", JSON.stringify(updated));
+    await setJWTCookie(updated);
   };
 
   const updateProgress = (chapterId: number, isCorrect: boolean) => {
@@ -296,7 +237,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           },
         },
       };
-      // Save progress per user ID
       localStorage.setItem(progressKey(user.id), JSON.stringify(newProgress));
       return newProgress;
     });

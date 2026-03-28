@@ -57,37 +57,20 @@ function LoginForm() {
   setError("");
   setIsLoading(true);
   try {
+    // OTP verify karo
     const res = await fetch(`/api/auth/send-otp?email=${email}&otp=${otp}`);
     const data = await res.json();
 
     if (data.valid) {
-      const registeredUsers = JSON.parse(
-        localStorage.getItem("neet_registered_users") || "{}"
-      );
+      // Supabase se user fetch karo aur JWT set karo
+      const loginRes = await fetch(`/api/auth/login-user?email=${email}`);
+      const loginData = await loginRes.json();
 
-      const existingRecord = registeredUsers[email];
-
-      if (!existingRecord) {
-        setError("No account found with this email. Please sign up first.");
-        setIsLoading(false);
-        return;
-      }
-
-      // .user se actual user object lo
-      const existingUser = existingRecord.user;
-
-      // JWT cookie set karo
-      const loginRes = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ user: existingUser }),
-      });
-
-      if (loginRes.ok) {
-        localStorage.setItem("neet_user", JSON.stringify(existingUser));
-        router.push(existingUser?.isAdmin ? "/admin" : "/dashboard");
+      if (loginRes.ok && loginData.user) {
+        localStorage.setItem("neet_user", JSON.stringify(loginData.user));
+        router.push(loginData.user?.isAdmin ? "/admin" : "/dashboard");
       } else {
-        setError("Login failed. Please try again.");
+        setError("No account found with this email. Please sign up first.");
       }
     } else {
       setError(data.error || "Invalid OTP. Please try again.");

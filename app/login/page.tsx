@@ -8,32 +8,94 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { BookOpen, Loader2, AlertCircle } from "lucide-react";
+import { BookOpen, Loader2, AlertCircle, Mail, KeyRound } from "lucide-react";
 import { useAuth, AuthProvider } from "@/lib/auth-context";
 
 function LoginForm() {
   const { login } = useAuth();
+  const [loginMethod, setLoginMethod] = useState<"password" | "otp">("password");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [otp, setOtp] = useState("");
+  const [otpSent, setOtpSent] = useState(false);
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [otpLoading, setOtpLoading] = useState(false);
   const router = useRouter();
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSendOTP = async () => {
+    if (!email) {
+      setError("Please enter your email first");
+      return;
+    }
+    setError("");
+    setOtpLoading(true);
+    try {
+      const res = await fetch("/api/auth/send-otp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setOtpSent(true);
+      } else {
+        setError("Failed to send OTP. Please try again.");
+      }
+    } catch {
+      setError("Failed to send OTP. Please try again.");
+    } finally {
+      setOtpLoading(false);
+    }
+  };
+
+  const handleOTPLogin = async () => {
+    if (!otp || otp.length !== 6) {
+      setError("Please enter valid 6-digit OTP");
+      return;
+    }
+    setError("");
+    setIsLoading(true);
+    try {
+      const res = await fetch(`/api/auth/send-otp?email=${email}&otp=${otp}`);
+      const data = await res.json();
+
+      if (data.valid) {
+        // Check if user exists
+        const registeredUsers = JSON.parse(
+          localStorage.getItem("neet_registered_users") || "{}"
+        );
+        
+        if (registeredUsers[email]) {
+          const success = await login(email, registeredUsers[email].password);
+          if (success) {
+            const storedUser = localStorage.getItem("neet_user");
+            const loggedInUser = storedUser ? JSON.parse(storedUser) : null;
+            router.push(loggedInUser?.isAdmin ? "/admin" : "/dashboard");
+          }
+        } else {
+          setError("No account found with this email. Please sign up first.");
+        }
+      } else {
+        setError(data.error || "Invalid OTP. Please try again.");
+      }
+    } catch {
+      setError("Something went wrong. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handlePasswordLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     setIsLoading(true);
-
     try {
       const success = await login(email, password);
       if (success) {
         const storedUser = localStorage.getItem("neet_user");
         const loggedInUser = storedUser ? JSON.parse(storedUser) : null;
-        if (loggedInUser?.isAdmin) {
-          router.push("/admin");
-        } else {
-          router.push("/dashboard");
-        }
+        router.push(loggedInUser?.isAdmin ? "/admin" : "/dashboard");
       } else {
         setError("Invalid email or password. Please try again.");
       }
@@ -67,51 +129,136 @@ function LoginForm() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              {error && (
-                <Alert variant="destructive">
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertDescription>{error}</AlertDescription>
-                </Alert>
-              )}
+            {/* Login Method Toggle */}
+            <div className="flex gap-2 mb-6 p-1 bg-muted rounded-lg">
+              <button
+                onClick={() => { setLoginMethod("password"); setError(""); setOtpSent(false); }}
+                className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-md text-sm font-medium transition-colors ${
+                  loginMethod === "password"
+                    ? "bg-background text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <KeyRound className="h-4 w-4" />
+                Password
+              </button>
+              <button
+                onClick={() => { setLoginMethod("otp"); setError(""); setOtpSent(false); }}
+                className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-md text-sm font-medium transition-colors ${
+                  loginMethod === "otp"
+                    ? "bg-background text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <Mail className="h-4 w-4" />
+                Email OTP
+              </button>
+            </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="you@example.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  disabled={isLoading}
-                />
-              </div>
+            {error && (
+              <Alert variant="destructive" className="mb-4">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
 
-              <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  placeholder="Enter your password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  disabled={isLoading}
-                />
-              </div>
+            {/* Password Login */}
+            {loginMethod === "password" && (
+              <form onSubmit={handlePasswordLogin} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    placeholder="you@example.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                    disabled={isLoading}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="password">Password</Label>
+                  <Input
+                    id="password"
+                    type="password"
+                    placeholder="Enter your password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    disabled={isLoading}
+                  />
+                </div>
+                <Button type="submit" className="w-full" disabled={isLoading}>
+                  {isLoading ? (
+                    <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Signing in...</>
+                  ) : "Sign In"}
+                </Button>
+              </form>
+            )}
 
-              <Button type="submit" className="w-full" disabled={isLoading}>
-                {isLoading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Signing in...
-                  </>
+            {/* OTP Login */}
+            {loginMethod === "otp" && (
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="otp-email">Email</Label>
+                  <Input
+                    id="otp-email"
+                    type="email"
+                    placeholder="you@example.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    disabled={otpSent || otpLoading}
+                  />
+                </div>
+
+                {!otpSent ? (
+                  <Button
+                    className="w-full"
+                    onClick={handleSendOTP}
+                    disabled={otpLoading || !email}
+                  >
+                    {otpLoading ? (
+                      <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Sending OTP...</>
+                    ) : "Send OTP"}
+                  </Button>
                 ) : (
-                  "Sign In"
+                  <>
+                    <div className="space-y-2">
+                      <Label htmlFor="otp">Enter OTP</Label>
+                      <Input
+                        id="otp"
+                        type="text"
+                        placeholder="6-digit OTP"
+                        value={otp}
+                        onChange={(e) => setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                        maxLength={6}
+                        disabled={isLoading}
+                        className="text-center text-xl tracking-widest font-bold"
+                      />
+                      <p className="text-xs text-muted-foreground text-center">
+                        OTP sent to {email} — valid for 10 minutes
+                      </p>
+                    </div>
+                    <Button
+                      className="w-full"
+                      onClick={handleOTPLogin}
+                      disabled={isLoading || otp.length !== 6}
+                    >
+                      {isLoading ? (
+                        <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Verifying...</>
+                      ) : "Verify OTP & Login"}
+                    </Button>
+                    <button
+                      onClick={() => { setOtpSent(false); setOtp(""); }}
+                      className="w-full text-sm text-muted-foreground hover:text-foreground"
+                    >
+                      Resend OTP
+                    </button>
+                  </>
                 )}
-              </Button>
-            </form>
+              </div>
+            )}
 
             <div className="mt-6 text-center text-sm">
               <span className="text-muted-foreground">{"Don't have an account? "}</span>
@@ -123,9 +270,7 @@ function LoginForm() {
         </Card>
 
         <p className="text-center text-sm text-muted-foreground mt-6">
-          <Link href="/" className="hover:text-foreground">
-            Back to Home
-          </Link>
+          <Link href="/" className="hover:text-foreground">Back to Home</Link>
         </p>
       </div>
     </div>

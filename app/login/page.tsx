@@ -50,42 +50,52 @@ function LoginForm() {
   };
 
   const handleOTPLogin = async () => {
-    if (!otp || otp.length !== 6) {
-      setError("Please enter valid 6-digit OTP");
-      return;
-    }
-    setError("");
-    setIsLoading(true);
-    try {
-      const res = await fetch(`/api/auth/send-otp?email=${email}&otp=${otp}`);
-      const data = await res.json();
+  if (!otp || otp.length !== 6) {
+    setError("Please enter valid 6-digit OTP");
+    return;
+  }
+  setError("");
+  setIsLoading(true);
+  try {
+    const res = await fetch(`/api/auth/send-otp?email=${email}&otp=${otp}`);
+    const data = await res.json();
 
-      if (data.valid) {
-        // Check if user exists
-        const registeredUsers = JSON.parse(
-          localStorage.getItem("neet_registered_users") || "{}"
-        );
-        
-        if (registeredUsers[email]) {
-          const success = await login(email, registeredUsers[email].password);
-          if (success) {
-            const storedUser = localStorage.getItem("neet_user");
-            const loggedInUser = storedUser ? JSON.parse(storedUser) : null;
-            router.push(loggedInUser?.isAdmin ? "/admin" : "/dashboard");
-          }
-        } else {
-          setError("No account found with this email. Please sign up first.");
-        }
-      } else {
-        setError(data.error || "Invalid OTP. Please try again.");
+    if (data.valid) {
+      // OTP valid — directly JWT token banao, password ki zaroorat nahi
+      const registeredUsers = JSON.parse(
+        localStorage.getItem("neet_registered_users") || "{}"
+      );
+
+      const existingUser = registeredUsers[email];
+
+      if (!existingUser) {
+        setError("No account found with this email. Please sign up first.");
+        return;
       }
-    } catch {
-      setError("Something went wrong. Please try again.");
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
+      // Direct JWT login — no password needed
+      const loginRes = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user: existingUser }),
+      });
+
+      if (loginRes.ok) {
+        // update Auth context 
+        localStorage.setItem("neet_user", JSON.stringify(existingUser));
+        router.push(existingUser?.isAdmin ? "/admin" : "/dashboard");
+      } else {
+        setError("Login failed. Please try again.");
+      }
+    } else {
+      setError(data.error || "Invalid OTP. Please try again.");
+    }
+  } catch {
+    setError("Something went wrong. Please try again.");
+  } finally {
+    setIsLoading(false);
+  }
+};
   const handlePasswordLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");

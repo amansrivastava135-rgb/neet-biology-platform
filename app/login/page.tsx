@@ -61,19 +61,22 @@ function LoginForm() {
     const data = await res.json();
 
     if (data.valid) {
-      // OTP valid — directly JWT token banao, password ki zaroorat nahi
       const registeredUsers = JSON.parse(
         localStorage.getItem("neet_registered_users") || "{}"
       );
 
-      const existingUser = registeredUsers[email];
+      const existingRecord = registeredUsers[email];
 
-      if (!existingUser) {
+      if (!existingRecord) {
         setError("No account found with this email. Please sign up first.");
+        setIsLoading(false);
         return;
       }
 
-      // Direct JWT login — no password needed
+      // .user se actual user object lo
+      const existingUser = existingRecord.user;
+
+      // JWT cookie set karo
       const loginRes = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -81,7 +84,6 @@ function LoginForm() {
       });
 
       if (loginRes.ok) {
-        // update Auth context 
         localStorage.setItem("neet_user", JSON.stringify(existingUser));
         router.push(existingUser?.isAdmin ? "/admin" : "/dashboard");
       } else {
@@ -96,6 +98,7 @@ function LoginForm() {
     setIsLoading(false);
   }
 };
+
   const handlePasswordLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");

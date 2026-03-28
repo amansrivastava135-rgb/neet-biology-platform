@@ -1,10 +1,13 @@
 import { Resend } from "resend";
 import { NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
-// In-memory OTP store (resets on server restart)
-const otpStore = new Map<string, { otp: string; expires: number }>();
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
 
 export async function POST(req: Request) {
   const { email } = await req.json();
@@ -15,10 +18,17 @@ export async function POST(req: Request) {
 
   // Generate 6-digit OTP
   const otp = Math.floor(100000 + Math.random() * 900000).toString();
-  const expires = Date.now() + 10 * 60 * 1000; // 10 minutes
+  const expires_at = Date.now() + 10 * 60 * 1000; // 10 minutes
 
-  // Store OTP
-  otpStore.set(email, { otp, expires });
+  // Store OTP in Supabase (upsert = update if exists)
+  const { error: dbError } = await supabase
+    .from("otp_store")
+    .upsert({ email, otp, expires_at }, { onConflict: "email" });
+
+  if (dbError) {
+    console.error("Supabase OTP store error:", dbError);
+    return NextResponse.json({ error: "Failed to store OTP" }, { status: 500 });
+  }
 
   try {
     await resend.emails.send({
@@ -53,7 +63,9 @@ export async function POST(req: Request) {
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Email send error:", error);
-    return NextResponse.json({ error: "Failed to send OTP" }, { status: 500 });
+    // OTP store ho gayi thi, email fail hui — cleanup karo
+    await supabase.from("otp_store").delete().eq("email", email);
+    return NextResponse.json({ error: "Failed to send email" }, { status: 500 });
   }
 }
 
@@ -66,21 +78,27 @@ export async function GET(req: Request) {
     return NextResponse.json({ valid: false });
   }
 
-  const stored = otpStore.get(email);
+  // Supabase se OTP fetch karo
+  const { data, error } = await supabase
+    .from("otp_store")
+    .select("otp, expires_at")
+    .eq("email", email)
+    .single();
 
-  if (!stored) {
+  if (error || !data) {
     return NextResponse.json({ valid: false, error: "OTP not found" });
   }
 
-  if (Date.now() > stored.expires) {
-    otpStore.delete(email);
+  if (Date.now() > data.expires_at) {
+    await supabase.from("otp_store").delete().eq("email", email);
     return NextResponse.json({ valid: false, error: "OTP expired" });
   }
 
-  if (stored.otp !== otp) {
+  if (data.otp !== otp) {
     return NextResponse.json({ valid: false, error: "Invalid OTP" });
   }
 
-  otpStore.delete(email);
+  // OTP sahi hai — delete karo (one-time use)
+  await supabase.from("otp_store").delete().eq("email", email);
   return NextResponse.json({ valid: true });
 }

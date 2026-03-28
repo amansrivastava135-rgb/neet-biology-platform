@@ -178,17 +178,22 @@ function LoginForm() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="password">Password</Label>
-                  <Input
-                    id="password"
-                    type="password"
-                    placeholder="Enter your password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                    disabled={isLoading}
-                  />
-                </div>
+  <div className="flex items-center justify-between">
+    <Label htmlFor="password">Password</Label>
+    <Link href="/forgot-password" className="text-xs text-primary hover:underline">
+      Forgot Password?
+    </Link>
+  </div>
+  <Input
+    id="password"
+    type="password"
+    placeholder="Enter your password"
+    value={password}
+    onChange={(e) => setPassword(e.target.value)}
+    required
+    disabled={isLoading}
+  />
+</div>
                 <Button type="submit" className="w-full" disabled={isLoading}>
                   {isLoading ? (
                     <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Signing in...</>

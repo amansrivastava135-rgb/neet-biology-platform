@@ -11,6 +11,8 @@ import { BookOpen, Lock, Play, Sparkles, ChevronRight, X, Calendar } from "lucid
 type ChapterSelectorProps = {
   onSelectChapter: (chapterId: number, setNumber?: number) => void;
   onStartDemo: () => void;
+  onStartPYQYear: (year: number) => void;
+  onStartPYQChapter: (chapterId: number) => void;
   isPaidUser: boolean;
 };
 

@@ -23,7 +23,7 @@ export function Footer() {
             </p>
           </div>
 
-          {/* Quick Links */}
+         {/* Quick Links */}
           <div>
             <h3 className="font-semibold mb-4">Quick Links</h3>
             <ul className="space-y-2 text-sm">
@@ -47,6 +47,21 @@ export function Footer() {
                   Student Login
                 </Link>
               </li>
+              <li>
+                <Link href="/privacy-policy" className="text-sidebar-foreground/70 hover:text-sidebar-foreground transition-colors">
+                  Privacy Policy
+                </Link>
+              </li>
+              <li>
+                <Link href="/terms" className="text-sidebar-foreground/70 hover:text-sidebar-foreground transition-colors">
+                  Terms & Conditions
+                </Link>
+              </li>
+              <li>
+                <Link href="/refund-policy" className="text-sidebar-foreground/70 hover:text-sidebar-foreground transition-colors">
+                  Refund Policy
+                </Link>
+              </li>
             </ul>
           </div>
 
@@ -56,7 +71,7 @@ export function Footer() {
             <ul className="space-y-3 text-sm">
               <li className="flex items-center gap-2 text-sidebar-foreground/70">
                 <Mail className="h-4 w-4" />
-                mail
+                neetmcq360@gmail.com
               </li>
               <li className="flex items-center gap-2 text-sidebar-foreground/70">
                 <Phone className="h-4 w-4" />

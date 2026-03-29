@@ -1,8 +1,10 @@
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
+import { AuthProvider } from "@/lib/auth-context";
 
 export default function PrivacyPolicyPage() {
   return (
+    <AuthProvider>
     <div className="min-h-screen flex flex-col bg-background">
       <Header />
       <main className="flex-1 container mx-auto px-4 py-12 max-w-3xl">
@@ -53,5 +55,6 @@ export default function PrivacyPolicyPage() {
       </main>
       <Footer />
     </div>
+    </AuthProvider>
   );
 }

@@ -1,46 +1,44 @@
- "use client";
+"use client";
 
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Users, FileQuestion, BookOpen, CreditCard, TrendingUp, IndianRupee } from "lucide-react";
-import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import { class11Chapters, class12Chapters } from "@/lib/data";
+import { createClient } from "@supabase/supabase-js";
 
-type StudentData = {
-  id: string;
-  name: string;
-  email: string;
-  isPaid: boolean;
-  subscriptionEnd?: string;
-};
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
 
 export function AdminOverview() {
-  const [students, setStudents] = useState<StudentData[]>([]);
+  const [students, setStudents] = useState<any[]>([]);
   const [totalQuestions, setTotalQuestions] = useState(0);
   const [premiumCount, setPremiumCount] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Load real students from localStorage
-    const registeredUsers = JSON.parse(
-      window.localStorage.getItem("neet_registered_users") || "{}"
-    );
-    const studentList: StudentData[] = Object.values(registeredUsers).map(
-      (entry: any) => ({
-        id: entry.user.id,
-        name: entry.user.name,
-        email: entry.user.email,
-        isPaid: entry.user.isPaid || false,
-        subscriptionEnd: entry.user.subscriptionEnd,
-      })
-    );
-    setStudents(studentList);
-    setPremiumCount(studentList.filter((s) => s.isPaid).length);
+    async function fetchData() {
+      // Supabase se students fetch karo
+      const { data: usersData } = await supabase
+        .from("users")
+        .select("id, name, email, is_paid, subscription_end");
 
-    // Load real questions count
-    const savedQuestions = JSON.parse(
-      window.localStorage.getItem("neet_admin_questions") || "[]"
-    );
-    setTotalQuestions(savedQuestions.length);
+      if (usersData) {
+        setStudents(usersData);
+        setPremiumCount(usersData.filter((u) => u.is_paid).length);
+      }
+
+      // Supabase se questions count fetch karo
+      const { count } = await supabase
+        .from("questions")
+        .select("*", { count: "exact", head: true });
+
+      setTotalQuestions(count || 0);
+      setIsLoading(false);
+    }
+    fetchData();
   }, []);
 
   const totalChapters = class11Chapters.length + class12Chapters.length;
@@ -49,14 +47,14 @@ export function AdminOverview() {
   const stats = [
     {
       title: "Total Students",
-      value: students.length.toString(),
+      value: isLoading ? "..." : students.length.toString(),
       icon: Users,
       color: "text-blue-500",
       bgColor: "bg-blue-500/10",
     },
     {
       title: "Total Questions",
-      value: totalQuestions.toString(),
+      value: isLoading ? "..." : totalQuestions.toString(),
       icon: FileQuestion,
       color: "text-green-500",
       bgColor: "bg-green-500/10",
@@ -70,17 +68,14 @@ export function AdminOverview() {
     },
     {
       title: "Est. Revenue",
-      value: `₹${revenue.toLocaleString()}`,
+      value: isLoading ? "..." : `₹${revenue.toLocaleString()}`,
       icon: IndianRupee,
       color: "text-amber-500",
       bgColor: "bg-amber-500/10",
     },
   ];
 
-  // Recent premium students
-  const recentPremium = students
-    .filter((s) => s.isPaid)
-    .slice(0, 5);
+  const recentPremium = students.filter((s) => s.is_paid).slice(0, 5);
 
   return (
     <div className="space-y-6">
@@ -104,7 +99,7 @@ export function AdminOverview() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Premium vs Free Chart */}
+        {/* Students Chart */}
         <Card className="border-border">
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
@@ -115,7 +110,7 @@ export function AdminOverview() {
           <CardContent>
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart
+                <BarChart
                   data={[
                     { label: "Free", count: students.length - premiumCount },
                     { label: "Premium", count: premiumCount },
@@ -129,26 +124,16 @@ export function AdminOverview() {
                       if (active && payload && payload.length) {
                         return (
                           <div className="bg-card border border-border rounded-lg p-3 shadow-lg">
-                            <p className="font-medium text-foreground">
-                              {payload[0].payload.label}
-                            </p>
-                            <p className="text-sm text-muted-foreground">
-                              Students: {payload[0].value}
-                            </p>
+                            <p className="font-medium text-foreground">{payload[0].payload.label}</p>
+                            <p className="text-sm text-muted-foreground">Students: {payload[0].value}</p>
                           </div>
                         );
                       }
                       return null;
                     }}
                   />
-                  <Line
-                    type="monotone"
-                    dataKey="count"
-                    stroke="hsl(var(--primary))"
-                    strokeWidth={2}
-                    dot={{ fill: "hsl(var(--primary))" }}
-                  />
-                </LineChart>
+                  <Bar dataKey="count" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                </BarChart>
               </ResponsiveContainer>
             </div>
           </CardContent>
@@ -165,9 +150,7 @@ export function AdminOverview() {
           <CardContent>
             {recentPremium.length === 0 ? (
               <div className="text-center py-8">
-                <p className="text-muted-foreground text-sm">
-                  No premium students yet.
-                </p>
+                <p className="text-muted-foreground text-sm">No premium students yet.</p>
               </div>
             ) : (
               <div className="space-y-4">
@@ -178,10 +161,10 @@ export function AdminOverview() {
                       <p className="text-sm text-muted-foreground">{student.email}</p>
                     </div>
                     <div className="text-right">
-                      <p className="text-sm font-medium text-foreground">Premium</p>
+                      <p className="text-sm font-medium text-green-500">Premium</p>
                       <p className="text-xs text-muted-foreground">
-                        {student.subscriptionEnd
-                          ? `Expires: ${new Date(student.subscriptionEnd).toLocaleDateString()}`
+                        {student.subscription_end
+                          ? `Expires: ${new Date(student.subscription_end).toLocaleDateString()}`
                           : "Active"}
                       </p>
                     </div>

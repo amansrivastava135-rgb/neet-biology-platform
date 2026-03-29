@@ -8,41 +8,21 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
-import { class11Chapters, class12Chapters, type Question } from "@/lib/data";
-import { Plus, Search, Trash2, ImagePlus, X, Edit, Upload, Download } from "lucide-react";
+import { class11Chapters, class12Chapters } from "@/lib/data";
+import { Plus, Search, Trash2, Edit, Upload, Download, Loader2 } from "lucide-react";
+import { createClient } from "@supabase/supabase-js";
 
-const STORAGE_KEY = "neet_admin_questions";
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
 
-function loadFromStorage(): any[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const stored = window.localStorage.getItem(STORAGE_KEY);
-    return stored ? JSON.parse(stored) : [];
-  } catch {
-    return [];
-  }
-}
-
-function saveToStorage(questions: any[]) {
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(questions));
-  } catch {}
-}
+const SET_SIZE = 90;
 
 const emptyForm = {
   question: "",
@@ -54,7 +34,7 @@ const emptyForm = {
   explanation: "",
   chapterId: 1,
   source: "NCERT" as "PYQ" | "NCERT",
-  imageUrl: "",
+  year: "",
 };
 
 export function QuestionManager() {
@@ -63,26 +43,43 @@ export function QuestionManager() {
   const [filterChapter, setFilterChapter] = useState("all");
   const [filterSource, setFilterSource] = useState("all");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [editingId, setEditingId] = useState<number | null>(null);
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [editingQuestion, setEditingQuestion] = useState<any | null>(null);
   const [bulkUploadStatus, setBulkUploadStatus] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const csvInputRef = useRef<HTMLInputElement>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
+  const [totalCount, setTotalCount] = useState(0);
   const [form, setForm] = useState({ ...emptyForm });
-
+  const csvInputRef = useRef<HTMLInputElement>(null);
   const allChapters = [...class11Chapters, ...class12Chapters];
 
   useEffect(() => {
-    setQuestions(loadFromStorage());
-  }, []);
+    fetchQuestions();
+  }, [filterChapter, filterSource]);
+
+  async function fetchQuestions() {
+    setIsLoading(true);
+    let query = supabase.from("questions").select("*").order("id", { ascending: false });
+    if (filterChapter !== "all") query = query.eq("chapter_id", parseInt(filterChapter));
+    if (filterSource !== "all") query = query.eq("source", filterSource);
+
+    const { data, error } = await query.limit(50);
+    if (!error && data) setQuestions(data);
+
+    // Total count
+    const { count } = await supabase
+      .from("questions")
+      .select("*", { count: "exact", head: true });
+    setTotalCount(count || 0);
+    setIsLoading(false);
+  }
 
   // Download sample CSV
   const handleDownloadSample = () => {
-    const headers = "question,optionA,optionB,optionC,optionD,correctAnswer,explanation,chapterId,source";
-    const sampleRow = `"Which is the basic unit of life?","Cell","Tissue","Organ","Organism","A","Cell is the basic structural and functional unit of life as per NCERT.",8,"NCERT"`;
-    const sampleRow2 = `"Binomial nomenclature was introduced by?","Aristotle","Linnaeus","Theophrastus","Darwin","B","Carolus Linnaeus introduced the binomial nomenclature system.",1,"PYQ"`;
-    const csvContent = `${headers}\n${sampleRow}\n${sampleRow2}`;
-    const blob = new Blob([csvContent], { type: "text/csv" });
+    const headers = "question,optionA,optionB,optionC,optionD,correctAnswer,explanation,chapterId,source,year";
+    const r1 = `"Which is the basic unit of life?","Cell","Tissue","Organ","Organism","A","Cell is the basic structural unit.",8,"NCERT",""`;
+    const r2 = `"Binomial nomenclature was introduced by?","Aristotle","Linnaeus","Theophrastus","Darwin","B","Carolus Linnaeus introduced it.",1,"PYQ","2020"`;
+    const blob = new Blob([`${headers}\n${r1}\n${r2}`], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
@@ -95,70 +92,106 @@ export function QuestionManager() {
   const parseCSV = (text: string): any[] => {
     const lines = text.trim().split("\n");
     if (lines.length < 2) return [];
-
     const results: any[] = [];
-    // Skip header row
+
     for (let i = 1; i < lines.length; i++) {
       const line = lines[i].trim();
       if (!line) continue;
 
-      // Handle quoted CSV fields
       const fields: string[] = [];
       let current = "";
       let inQuotes = false;
       for (let j = 0; j < line.length; j++) {
-        if (line[j] === '"') {
-          inQuotes = !inQuotes;
-        } else if (line[j] === "," && !inQuotes) {
-          fields.push(current.trim());
-          current = "";
-        } else {
-          current += line[j];
-        }
+        if (line[j] === '"') { inQuotes = !inQuotes; }
+        else if (line[j] === "," && !inQuotes) { fields.push(current.trim()); current = ""; }
+        else { current += line[j]; }
       }
       fields.push(current.trim());
-
       if (fields.length < 8) continue;
 
-      const [question, optionA, optionB, optionC, optionD, correctAnswer, explanation, chapterId, source] = fields;
+      const [question, optionA, optionB, optionC, optionD, correctAnswer, explanation, chapterId, source, year] = fields;
       const chapId = parseInt(chapterId) || 1;
       const chapter = allChapters.find((c) => c.id === chapId);
 
       results.push({
-        id: Date.now() + i,
         question,
-        options: { A: optionA, B: optionB, C: optionC, D: optionD },
-        correctAnswer: (correctAnswer?.toUpperCase() as "A" | "B" | "C" | "D") || "A",
+        option_a: optionA,
+        option_b: optionB,
+        option_c: optionC,
+        option_d: optionD,
+        correct_answer: (correctAnswer?.toUpperCase() as string) || "A",
         explanation: explanation || "",
-        chapterId: chapId,
-        chapterName: chapter?.name || "",
-        source: (source?.toUpperCase() === "PYQ" ? "PYQ" : "NCERT") as "PYQ" | "NCERT",
+        chapter_id: chapId,
+        chapter_name: chapter?.name || "",
+        source: source?.toUpperCase() === "PYQ" ? "PYQ" : "NCERT",
+        year: year && !isNaN(parseInt(year)) ? parseInt(year) : null,
       });
     }
     return results;
   };
 
-  // Handle bulk CSV upload
+  // Bulk Upload — Supabase mein
   const handleBulkUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    setBulkUploadStatus("⏳ Uploading...");
 
-    setBulkUploadStatus("Uploading...");
     const reader = new FileReader();
-    reader.onloadend = () => {
+    reader.onloadend = async () => {
       try {
         const text = reader.result as string;
-        const newQuestions = parseCSV(text);
-        if (newQuestions.length === 0) {
+        const parsed = parseCSV(text);
+
+        if (parsed.length === 0) {
           setBulkUploadStatus("❌ No valid questions found. Check CSV format!");
           return;
         }
-        const updated = [...newQuestions, ...questions];
-        setQuestions(updated);
-        saveToStorage(updated);
-        setBulkUploadStatus(`✅ ${newQuestions.length} questions uploaded successfully!`);
-        setTimeout(() => setBulkUploadStatus(null), 5000);
-      } catch {
+
+        let inserted = 0;
+        let skipped = 0;
+
+        // Chapter wise group karo for set numbering
+        const byChapter: Record<number, any[]> = {};
+        for (const q of parsed) {
+          if (!byChapter[q.chapter_id]) byChapter[q.chapter_id] = [];
+          byChapter[q.chapter_id].push(q);
+        }
+
+        for (const [chapId, qs] of Object.entries(byChapter)) {
+          // Current count fetch karo
+          const { count } = await supabase
+            .from("questions")
+            .select("*", { count: "exact", head: true })
+            .eq("chapter_id", parseInt(chapId));
+
+          let currentCount = count || 0;
+
+          for (const q of qs) {
+            // Duplicate check
+            const { data: existing } = await supabase
+              .from("questions")
+              .select("id")
+              .eq("chapter_id", q.chapter_id)
+              .eq("question", q.question)
+              .single();
+
+            if (existing) { skipped++; continue; }
+
+            const setNumber = Math.floor(currentCount / SET_SIZE) + 1;
+
+            const { error } = await supabase.from("questions").insert({
+              ...q,
+              set_number: setNumber,
+            });
+
+            if (!error) { inserted++; currentCount++; }
+          }
+        }
+
+        setBulkUploadStatus(`✅ ${inserted} questions uploaded, ${skipped} skipped (duplicates)`);
+        fetchQuestions();
+        setTimeout(() => setBulkUploadStatus(null), 6000);
+      } catch (err) {
         setBulkUploadStatus("❌ Error parsing CSV. Please check the format!");
       }
       if (csvInputRef.current) csvInputRef.current.value = "";
@@ -166,101 +199,124 @@ export function QuestionManager() {
     reader.readAsText(file);
   };
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      const base64 = reader.result as string;
-      setImagePreview(base64);
-      setForm({ ...form, imageUrl: base64 });
-    };
-    reader.readAsDataURL(file);
-  };
-
-  const handleRemoveImage = () => {
-    setImagePreview(null);
-    setForm({ ...form, imageUrl: "" });
-    if (fileInputRef.current) fileInputRef.current.value = "";
-  };
-
   const openAddDialog = () => {
-    setEditingId(null);
+    setEditingQuestion(null);
     setForm({ ...emptyForm });
-    setImagePreview(null);
     setIsDialogOpen(true);
   };
 
   const openEditDialog = (question: any) => {
-    setEditingId(question.id);
+    setEditingQuestion(question);
     setForm({
       question: question.question,
-      optionA: question.options.A,
-      optionB: question.options.B,
-      optionC: question.options.C,
-      optionD: question.options.D,
-      correctAnswer: question.correctAnswer,
-      explanation: question.explanation,
-      chapterId: question.chapterId,
-      source: question.source,
-      imageUrl: question.imageUrl || "",
+      optionA: question.option_a,
+      optionB: question.option_b,
+      optionC: question.option_c,
+      optionD: question.option_d,
+      correctAnswer: question.correct_answer as "A" | "B" | "C" | "D",
+      explanation: question.explanation || "",
+      chapterId: question.chapter_id,
+      source: question.source as "PYQ" | "NCERT",
+      year: question.year?.toString() || "",
     });
-    setImagePreview(question.imageUrl || null);
     setIsDialogOpen(true);
   };
 
-  const handleSave = () => {
-    const chapter = allChapters.find((c) => c.id === form.chapterId);
-    const questionData: any = {
-      id: editingId ?? Date.now(),
-      question: form.question,
-      options: {
-        A: form.optionA,
-        B: form.optionB,
-        C: form.optionC,
-        D: form.optionD,
-      },
-      correctAnswer: form.correctAnswer,
-      explanation: form.explanation,
-      chapterId: form.chapterId,
-      chapterName: chapter?.name || "",
-      source: form.source,
-    };
-    if (form.imageUrl) questionData.imageUrl = form.imageUrl;
-
-    let updated;
-    if (editingId !== null) {
-      updated = questions.map((q) => (q.id === editingId ? questionData : q));
-    } else {
-      updated = [questionData, ...questions];
+  const handleSave = async () => {
+    if (!form.question || !form.optionA || !form.optionB || !form.optionC || !form.optionD) {
+      alert("Saare required fields fill karo!");
+      return;
     }
 
-    setQuestions(updated);
-    saveToStorage(updated);
+    setIsSaving(true);
+    const chapter = allChapters.find((c) => c.id === form.chapterId);
+
+    if (editingQuestion) {
+      // Update
+      const { error } = await supabase
+        .from("questions")
+        .update({
+          question: form.question,
+          option_a: form.optionA,
+          option_b: form.optionB,
+          option_c: form.optionC,
+          option_d: form.optionD,
+          correct_answer: form.correctAnswer,
+          explanation: form.explanation,
+          chapter_id: form.chapterId,
+          chapter_name: chapter?.name || "",
+          source: form.source,
+          year: form.source === "PYQ" && form.year ? parseInt(form.year) : null,
+        })
+        .eq("id", editingQuestion.id);
+
+      if (error) { alert("Error: " + error.message); }
+    } else {
+      // Insert new
+      const { count } = await supabase
+        .from("questions")
+        .select("*", { count: "exact", head: true })
+        .eq("chapter_id", form.chapterId);
+
+      const setNumber = Math.floor((count || 0) / SET_SIZE) + 1;
+
+      // Duplicate check
+      const { data: existing } = await supabase
+        .from("questions")
+        .select("id")
+        .eq("chapter_id", form.chapterId)
+        .eq("question", form.question)
+        .single();
+
+      if (existing) {
+        alert("Ye question already exist karta hai is chapter mein!");
+        setIsSaving(false);
+        return;
+      }
+
+      const { error } = await supabase.from("questions").insert({
+        question: form.question,
+        option_a: form.optionA,
+        option_b: form.optionB,
+        option_c: form.optionC,
+        option_d: form.optionD,
+        correct_answer: form.correctAnswer,
+        explanation: form.explanation,
+        chapter_id: form.chapterId,
+        chapter_name: chapter?.name || "",
+        source: form.source,
+        year: form.source === "PYQ" && form.year ? parseInt(form.year) : null,
+        set_number: setNumber,
+      });
+
+      if (error) { alert("Error: " + error.message); }
+    }
+
+    setIsSaving(false);
     setIsDialogOpen(false);
-    setImagePreview(null);
     setForm({ ...emptyForm });
-    setEditingId(null);
+    setEditingQuestion(null);
+    fetchQuestions();
   };
 
-  const handleDeleteQuestion = (id: number) => {
-    const updated = questions.filter((q) => q.id !== id);
-    setQuestions(updated);
-    saveToStorage(updated);
+  const handleDelete = async (id: number) => {
+    const { error } = await supabase.from("questions").delete().eq("id", id);
+    if (!error) {
+      setQuestions((prev) => prev.filter((q) => q.id !== id));
+      setDeleteConfirmId(null);
+      setTotalCount((prev) => prev - 1);
+    }
   };
 
-  const filteredQuestions = questions.filter((q) => {
-    const matchesSearch = q.question.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesChapter = filterChapter === "all" || q.chapterId.toString() === filterChapter;
-    const matchesSource = filterSource === "all" || q.source === filterSource;
-    return matchesSearch && matchesChapter && matchesSource;
-  });
+  const filteredQuestions = questions.filter((q) =>
+    q.question.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   return (
     <div className="space-y-6">
       {/* Action Bar */}
       <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-        <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
+        <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
@@ -270,20 +326,18 @@ export function QuestionManager() {
               className="pl-10 w-full sm:w-64"
             />
           </div>
-          <Select value={filterChapter} onValueChange={setFilterChapter}>
+          <Select value={filterChapter} onValueChange={(v) => { setFilterChapter(v); }}>
             <SelectTrigger className="w-full sm:w-48">
               <SelectValue placeholder="Filter by chapter" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Chapters</SelectItem>
-              {allChapters.map((chapter) => (
-                <SelectItem key={chapter.id} value={chapter.id.toString()}>
-                  {chapter.name}
-                </SelectItem>
+              {allChapters.map((c) => (
+                <SelectItem key={c.id} value={c.id.toString()}>{c.name}</SelectItem>
               ))}
             </SelectContent>
           </Select>
-          <Select value={filterSource} onValueChange={setFilterSource}>
+          <Select value={filterSource} onValueChange={(v) => { setFilterSource(v); }}>
             <SelectTrigger className="w-full sm:w-32">
               <SelectValue placeholder="Source" />
             </SelectTrigger>
@@ -296,26 +350,15 @@ export function QuestionManager() {
         </div>
 
         <div className="flex gap-2 w-full sm:w-auto">
-          {/* Download Sample CSV */}
           <Button variant="outline" className="gap-2" onClick={handleDownloadSample}>
             <Download className="h-4 w-4" />
             Sample CSV
           </Button>
-
-          {/* Bulk Upload */}
           <Button variant="outline" className="gap-2" onClick={() => csvInputRef.current?.click()}>
             <Upload className="h-4 w-4" />
             Bulk Upload
           </Button>
-          <input
-            ref={csvInputRef}
-            type="file"
-            accept=".csv"
-            className="hidden"
-            onChange={handleBulkUpload}
-          />
-
-          {/* Add Single Question */}
+          <input ref={csvInputRef} type="file" accept=".csv" className="hidden" onChange={handleBulkUpload} />
           <Button className="gap-2" onClick={openAddDialog}>
             <Plus className="h-4 w-4" />
             Add Question
@@ -323,28 +366,26 @@ export function QuestionManager() {
         </div>
       </div>
 
-      {/* Bulk Upload Status */}
+      {/* Status */}
       {bulkUploadStatus && (
         <div className={`p-3 rounded-lg text-sm font-medium ${
-          bulkUploadStatus.startsWith("✅")
-            ? "bg-green-100 text-green-800"
-            : bulkUploadStatus.startsWith("❌")
-            ? "bg-red-100 text-red-800"
-            : "bg-blue-100 text-blue-800"
+          bulkUploadStatus.startsWith("✅") ? "bg-green-100 text-green-800" :
+          bulkUploadStatus.startsWith("❌") ? "bg-red-100 text-red-800" :
+          "bg-blue-100 text-blue-800"
         }`}>
           {bulkUploadStatus}
         </div>
       )}
 
-      {/* CSV Format Info */}
+      {/* CSV Format */}
       <Card className="border-border bg-muted/30">
         <CardContent className="pt-4 pb-4">
-          <p className="text-sm font-medium text-foreground mb-1">📋 CSV Format:</p>
+          <p className="text-sm font-medium mb-1">📋 CSV Format:</p>
           <p className="text-xs text-muted-foreground font-mono">
-            question, optionA, optionB, optionC, optionD, correctAnswer, explanation, chapterId, source
+            question, optionA, optionB, optionC, optionD, correctAnswer, explanation, chapterId, source, year
           </p>
           <p className="text-xs text-muted-foreground mt-1">
-            correctAnswer: A/B/C/D | source: NCERT/PYQ | chapterId: 1-38
+            correctAnswer: A/B/C/D | source: NCERT/PYQ | chapterId: 1-38 | year: 2020 (only for PYQ)
           </p>
         </CardContent>
       </Card>
@@ -353,48 +394,26 @@ export function QuestionManager() {
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{editingId ? "Edit Question" : "Add New Question"}</DialogTitle>
+            <DialogTitle>{editingQuestion ? "Edit Question" : "Add New Question"}</DialogTitle>
             <DialogDescription>
-              {editingId ? "Update the question details" : "Create a new MCQ for the question bank"}
+              {editingQuestion ? "Update question details" : "Add a new MCQ to Supabase"}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label>Question</Label>
+              <Label>Question *</Label>
               <Textarea
                 placeholder="Enter the question..."
                 value={form.question}
                 onChange={(e) => setForm({ ...form, question: e.target.value })}
+                rows={3}
               />
-            </div>
-
-            <div className="space-y-2">
-              <Label>Question Image (Optional)</Label>
-              <div className="border-2 border-dashed border-border rounded-lg p-4">
-                {imagePreview ? (
-                  <div className="relative">
-                    <img src={imagePreview} alt="Question" className="max-h-48 mx-auto rounded-lg object-contain" />
-                    <Button variant="destructive" size="icon" className="absolute top-2 right-2 h-6 w-6" onClick={handleRemoveImage}>
-                      <X className="h-3 w-3" />
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="text-center">
-                    <ImagePlus className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
-                    <p className="text-sm text-muted-foreground mb-2">Upload an image for this question</p>
-                    <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
-                      Choose Image
-                    </Button>
-                    <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
-                  </div>
-                )}
-              </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               {(["A", "B", "C", "D"] as const).map((opt) => (
                 <div key={opt} className="space-y-2">
-                  <Label>Option {opt}</Label>
+                  <Label>Option {opt} *</Label>
                   <Input
                     value={form[`option${opt}` as keyof typeof form] as string}
                     onChange={(e) => setForm({ ...form, [`option${opt}`]: e.target.value })}
@@ -405,8 +424,8 @@ export function QuestionManager() {
 
             <div className="grid grid-cols-3 gap-4">
               <div className="space-y-2">
-                <Label>Correct Answer</Label>
-                <Select value={form.correctAnswer} onValueChange={(v) => setForm({ ...form, correctAnswer: v as "A" | "B" | "C" | "D" })}>
+                <Label>Correct Answer *</Label>
+                <Select value={form.correctAnswer} onValueChange={(v) => setForm({ ...form, correctAnswer: v as any })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {["A", "B", "C", "D"].map((v) => <SelectItem key={v} value={v}>{v}</SelectItem>)}
@@ -414,19 +433,19 @@ export function QuestionManager() {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label>Chapter</Label>
+                <Label>Chapter *</Label>
                 <Select value={form.chapterId.toString()} onValueChange={(v) => setForm({ ...form, chapterId: parseInt(v) })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    {allChapters.map((chapter) => (
-                      <SelectItem key={chapter.id} value={chapter.id.toString()}>{chapter.name}</SelectItem>
+                    {allChapters.map((c) => (
+                      <SelectItem key={c.id} value={c.id.toString()}>{c.name}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label>Source</Label>
-                <Select value={form.source} onValueChange={(v) => setForm({ ...form, source: v as "PYQ" | "NCERT" })}>
+                <Label>Source *</Label>
+                <Select value={form.source} onValueChange={(v) => setForm({ ...form, source: v as any })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="NCERT">NCERT</SelectItem>
@@ -436,19 +455,32 @@ export function QuestionManager() {
               </div>
             </div>
 
+            {form.source === "PYQ" && (
+              <div className="space-y-2">
+                <Label>Year</Label>
+                <Input
+                  placeholder="2023"
+                  value={form.year}
+                  onChange={(e) => setForm({ ...form, year: e.target.value })}
+                />
+              </div>
+            )}
+
             <div className="space-y-2">
               <Label>Explanation</Label>
               <Textarea
-                placeholder="Enter detailed explanation referencing NCERT concepts..."
+                placeholder="Explanation (optional)"
                 value={form.explanation}
                 onChange={(e) => setForm({ ...form, explanation: e.target.value })}
-                rows={4}
+                rows={3}
               />
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsDialogOpen(false)}>Cancel</Button>
-            <Button onClick={handleSave}>{editingId ? "Save Changes" : "Add Question"}</Button>
+            <Button onClick={handleSave} disabled={isSaving}>
+              {isSaving ? <><Loader2 className="h-4 w-4 animate-spin mr-2" />Saving...</> : editingQuestion ? "Save Changes" : "Add Question"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -456,37 +488,52 @@ export function QuestionManager() {
       {/* Questions List */}
       <Card className="border-border">
         <CardHeader>
-          <CardTitle className="text-lg">Questions ({filteredQuestions.length})</CardTitle>
+          <CardTitle className="text-lg">
+            Questions ({isLoading ? "..." : `${filteredQuestions.length} shown / ${totalCount} total`})
+          </CardTitle>
         </CardHeader>
         <CardContent>
-          {questions.length === 0 ? (
+          {isLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="h-6 w-6 animate-spin text-primary" />
+              <span className="ml-2 text-muted-foreground">Loading...</span>
+            </div>
+          ) : filteredQuestions.length === 0 ? (
             <div className="text-center py-12">
-              <p className="text-muted-foreground">No questions added yet. Click "Add Question" or use "Bulk Upload"!</p>
+              <p className="text-muted-foreground">No questions found.</p>
             </div>
           ) : (
-            <div className="space-y-4">
-              {filteredQuestions.slice(0, 20).map((question: any) => (
-                <div key={question.id} className="p-4 border border-border rounded-lg">
+            <div className="space-y-3">
+              {filteredQuestions.map((q: any) => (
+                <div key={q.id} className="p-4 border border-border rounded-lg">
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex-1">
-                      {question.imageUrl && (
-                        <img src={question.imageUrl} alt="Question" className="max-h-32 mb-2 rounded-lg object-contain" />
-                      )}
-                      <p className="font-medium text-foreground mb-2">{question.question}</p>
+                      <p className="font-medium text-foreground mb-2 text-sm">{q.question}</p>
                       <div className="flex items-center gap-2 flex-wrap">
-                        <Badge variant="secondary">{question.chapterName}</Badge>
-                        <Badge variant={question.source === "PYQ" ? "default" : "outline"}>{question.source}</Badge>
-                        <span className="text-sm text-muted-foreground">Correct: {question.correctAnswer}</span>
-                        {question.imageUrl && <Badge variant="outline" className="text-blue-600">📷 Has Image</Badge>}
+                        <Badge variant="secondary" className="text-xs">{q.chapter_name}</Badge>
+                        <Badge variant={q.source === "PYQ" ? "default" : "outline"} className="text-xs">
+                          {q.source === "PYQ" ? `PYQ ${q.year || ""}` : "NCERT"}
+                        </Badge>
+                        <span className="text-xs text-muted-foreground">✓ {q.correct_answer}</span>
+                        <Badge variant="outline" className="text-xs">Set {q.set_number}</Badge>
                       </div>
                     </div>
-                    <div className="flex gap-2">
-                      <Button variant="ghost" size="icon" onClick={() => openEditDialog(question)}>
+                    <div className="flex gap-1">
+                      <Button variant="ghost" size="icon" onClick={() => openEditDialog(q)}>
                         <Edit className="h-4 w-4 text-primary" />
                       </Button>
-                      <Button variant="ghost" size="icon" onClick={() => handleDeleteQuestion(question.id)}>
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
+                      {deleteConfirmId === q.id ? (
+                        <div className="flex items-center gap-1">
+                          <Button size="sm" variant="destructive" className="h-7 text-xs px-2"
+                            onClick={() => handleDelete(q.id)}>Yes</Button>
+                          <Button size="sm" variant="outline" className="h-7 text-xs px-2"
+                            onClick={() => setDeleteConfirmId(null)}>No</Button>
+                        </div>
+                      ) : (
+                        <Button variant="ghost" size="icon" onClick={() => setDeleteConfirmId(q.id)}>
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      )}
                     </div>
                   </div>
                 </div>

@@ -1,12 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { class11Chapters, class12Chapters, sampleQuestions } from "@/lib/data";
-import { BookOpen, Lock, Play, Sparkles, ChevronRight, X, Calendar } from "lucide-react";
+import { class11Chapters, class12Chapters } from "@/lib/data";
+import { BookOpen, Lock, Play, Sparkles, ChevronRight, X, Calendar, Loader2 } from "lucide-react";
 
 type ChapterSelectorProps = {
   onSelectChapter: (chapterId: number, setNumber?: number) => void;
@@ -23,123 +23,88 @@ type SetInfo = {
   type: "auto" | "manual";
 };
 
-// Get all unique PYQ years from data
-function getPYQYears(): number[] {
-  const years = sampleQuestions
-    .filter((q) => q.source === "PYQ" && q.year)
-    .map((q) => q.year as number);
-  return [...new Set(years)].sort((a, b) => b - a);
-}
-
-// Get PYQ questions filtered by year or chapter
-function getPYQQuestions(filterYear?: number, filterChapter?: number) {
-  let adminQuestions: any[] = [];
+// Supabase se sets fetch karo
+async function getSetsForChapter(chapterId: number): Promise<SetInfo[]> {
   try {
-    if (typeof window !== "undefined") {
-      const stored = window.localStorage.getItem("neet_admin_questions");
-      if (stored) adminQuestions = JSON.parse(stored);
-    }
-  } catch {}
-
-  const allQuestions = [...adminQuestions, ...sampleQuestions].filter(
-    (q) => q.source === "PYQ"
-  );
-
-  if (filterYear) return allQuestions.filter((q) => q.year === filterYear);
-  if (filterChapter) return allQuestions.filter((q) => q.chapterId === filterChapter);
-  return allQuestions;
+    const res = await fetch(`/api/questions?chapterId=${chapterId}`);
+    const data = await res.json();
+    // PYQ Set remove karo — alag tab hai
+    const sets = (data.sets || []).filter((s: SetInfo) => s.label !== "PYQ Set");
+    return sets;
+  } catch {
+    return [];
+  }
 }
 
-function getAdminQuestions() {
+// Supabase se chapter question count fetch karo
+async function getChapterQuestionCount(chapterId: number): Promise<number> {
   try {
-    if (typeof window !== "undefined") {
-      const stored = window.localStorage.getItem("neet_admin_questions");
-      return stored ? JSON.parse(stored) : [];
-    }
-  } catch {}
-  return [];
+    const res = await fetch(`/api/questions?chapterId=${chapterId}`);
+    const data = await res.json();
+    return data.questions?.length || 0;
+  } catch {
+    return 0;
+  }
 }
 
-function getSetsForChapter(chapterId: number): SetInfo[] {
-  const { sampleQuestions } = require("@/lib/data");
-  const adminQuestions = getAdminQuestions();
-  const allQuestions = [...adminQuestions, ...sampleQuestions].filter(
-    (q: any) => q.chapterId === chapterId
-  );
-
-  const manualSets: Record<number, number> = {};
-  const autoQuestions: any[] = [];
-
-  allQuestions.forEach((q: any) => {
-    if (q.setNumber) {
-      manualSets[q.setNumber] = (manualSets[q.setNumber] || 0) + 1;
-    } else {
-      autoQuestions.push(q);
-    }
-  });
-
-  const sets: SetInfo[] = [];
-
-  Object.entries(manualSets).forEach(([num, count]) => {
-    sets.push({
-      setNumber: parseInt(num),
-      label: `Set ${num}`,
-      questionCount: count,
-      type: "manual",
-    });
-  });
-
-  const SET_SIZE = 90;
-  for (let i = 0; i < autoQuestions.length; i += SET_SIZE) {
-    const setNum = sets.length + 1;
-    sets.push({
-      setNumber: setNum,
-      label: `Set ${setNum}`,
-      questionCount: Math.min(SET_SIZE, autoQuestions.length - i),
-      type: "auto",
-    });
+// Supabase se PYQ data fetch karo
+async function fetchPYQData() {
+  try {
+    const res = await fetch(`/api/questions?source=PYQ`);
+    const data = await res.json();
+    return data.questions || [];
+  } catch {
+    return [];
   }
-
-  const pyqCount = allQuestions.filter((q: any) => q.source === "PYQ").length;
-  if (pyqCount > 0) {
-    sets.push({
-      setNumber: sets.length + 1,
-      label: "PYQ Set",
-      questionCount: pyqCount,
-      type: "auto",
-    });
-  }
-
-  return sets;
 }
 
 // PYQ Tab Component
 function PYQTab({
-  onSelectChapter,
+  onStartPYQYear,
+  onStartPYQChapter,
   isPaidUser,
 }: {
-  onSelectChapter: (chapterId: number, setNumber?: number) => void;
+  onStartPYQYear: (year: number) => void;
+  onStartPYQChapter: (chapterId: number) => void;
   isPaidUser: boolean;
 }) {
   const [pyqFilter, setPyqFilter] = useState<"year" | "chapter">("year");
-  const [selectedYear, setSelectedYear] = useState<number | null>(null);
-  const years = getPYQYears();
+  const [pyqQuestions, setPyqQuestions] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const allChapters = [...class11Chapters, ...class12Chapters];
 
-  // Group PYQ by year
-  const pyqByYear = years.map((year) => ({
-    year,
-    questions: getPYQQuestions(year),
-    count: getPYQQuestions(year).length,
-  }));
+  useEffect(() => {
+    fetchPYQData().then((qs) => {
+      setPyqQuestions(qs);
+      setIsLoading(false);
+    });
+  }, []);
 
-  // Group PYQ by chapter
+  // Group by year
+  const yearMap: Record<number, number> = {};
+  pyqQuestions.forEach((q) => {
+    if (q.year) yearMap[q.year] = (yearMap[q.year] || 0) + 1;
+  });
+  const pyqByYear = Object.entries(yearMap)
+    .map(([year, count]) => ({ year: parseInt(year), count }))
+    .sort((a, b) => b.year - a.year);
+
+  // Group by chapter
+  const chapterMap: Record<number, number> = {};
+  pyqQuestions.forEach((q) => {
+    chapterMap[q.chapter_id] = (chapterMap[q.chapter_id] || 0) + 1;
+  });
   const pyqByChapter = allChapters
-    .map((chapter) => ({
-      chapter,
-      count: getPYQQuestions(undefined, chapter.id).length,
-    }))
+    .map((chapter) => ({ chapter, count: chapterMap[chapter.id] || 0 }))
     .filter((c) => c.count > 0);
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-24">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -187,7 +152,6 @@ function PYQTab({
                   className={`border-border hover:border-primary/50 transition-colors cursor-pointer ${
                     !isPaidUser ? "opacity-75" : ""
                   }`}
-                  onClick={() => isPaidUser && setSelectedYear(year)}
                 >
                   <CardHeader className="pb-3">
                     <div className="flex items-start justify-between">
@@ -197,9 +161,7 @@ function PYQTab({
                         </span>
                         <CardTitle className="text-base">NEET {year}</CardTitle>
                       </div>
-                      {!isPaidUser && (
-                        <Lock className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                      )}
+                      {!isPaidUser && <Lock className="h-4 w-4 text-muted-foreground flex-shrink-0" />}
                     </div>
                   </CardHeader>
                   <CardContent>
@@ -214,25 +176,11 @@ function PYQTab({
                       className="w-full"
                       variant={isPaidUser ? "default" : "secondary"}
                       disabled={!isPaidUser}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (isPaidUser) {
-                          // Find first chapter that has PYQ for this year
-                          const yearQuestions = getPYQQuestions(year);
-                          if (yearQuestions.length > 0) {
-                            onSelectChapter(yearQuestions[0].chapterId);
-                          }
-                        }
-                      }}
+                      onClick={() => isPaidUser && onStartPYQYear(year)}
                     >
                       {isPaidUser ? (
-                        <>
-                          <Play className="h-4 w-4 mr-2" />
-                          Practice {year} PYQ
-                        </>
-                      ) : (
-                        "Unlock Premium"
-                      )}
+                        <><Play className="h-4 w-4 mr-2" />Practice {year} PYQ</>
+                      ) : "Unlock Premium"}
                     </Button>
                   </CardContent>
                 </Card>
@@ -249,7 +197,6 @@ function PYQTab({
             <div className="text-center py-12">
               <BookOpen className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
               <p className="text-muted-foreground font-medium">No PYQ questions available yet</p>
-              <p className="text-sm text-muted-foreground mt-1">Admin can add PYQ questions from the admin panel</p>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -259,7 +206,6 @@ function PYQTab({
                   className={`border-border hover:border-primary/50 transition-colors cursor-pointer ${
                     !isPaidUser ? "opacity-75" : ""
                   }`}
-                  onClick={() => isPaidUser && onSelectChapter(chapter.id)}
                 >
                   <CardHeader className="pb-3">
                     <div className="flex items-start justify-between">
@@ -267,13 +213,9 @@ function PYQTab({
                         <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-sm font-medium text-primary">
                           {chapter.id}
                         </span>
-                        <CardTitle className="text-base leading-snug">
-                          {chapter.name}
-                        </CardTitle>
+                        <CardTitle className="text-base leading-snug">{chapter.name}</CardTitle>
                       </div>
-                      {!isPaidUser && (
-                        <Lock className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                      )}
+                      {!isPaidUser && <Lock className="h-4 w-4 text-muted-foreground flex-shrink-0" />}
                     </div>
                   </CardHeader>
                   <CardContent>
@@ -288,19 +230,11 @@ function PYQTab({
                       className="w-full"
                       variant={isPaidUser ? "default" : "secondary"}
                       disabled={!isPaidUser}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        isPaidUser && onSelectChapter(chapter.id);
-                      }}
+                      onClick={() => isPaidUser && onStartPYQChapter(chapter.id)}
                     >
                       {isPaidUser ? (
-                        <>
-                          <Play className="h-4 w-4 mr-2" />
-                          Practice PYQs
-                        </>
-                      ) : (
-                        "Unlock Premium"
-                      )}
+                        <><Play className="h-4 w-4 mr-2" />Practice PYQs</>
+                      ) : "Unlock Premium"}
                     </Button>
                   </CardContent>
                 </Card>
@@ -310,33 +244,104 @@ function PYQTab({
         </div>
       )}
 
-      {/* Premium prompt */}
       {!isPaidUser && (
         <div className="mt-8 p-6 bg-secondary/50 rounded-lg text-center">
           <p className="text-foreground font-medium mb-2">Unlock all PYQs with Premium</p>
           <p className="text-muted-foreground text-sm mb-4">
             Access year-wise and chapter-wise PYQs from 2010-2024
           </p>
-          <Button asChild>
-            <a href="/pricing">View Pricing</a>
-          </Button>
+          <Button asChild><a href="/pricing">View Pricing</a></Button>
         </div>
       )}
     </div>
   );
 }
 
-export function ChapterSelector({ onSelectChapter, onStartDemo, isPaidUser }: ChapterSelectorProps) {
+// Chapter card with live question count
+function ChapterCard({
+  chapter,
+  index,
+  isUnlocked,
+  onClick,
+}: {
+  chapter: { id: number; name: string; questionCount: number };
+  index: number;
+  isUnlocked: boolean;
+  onClick: () => void;
+}) {
+  const [questionCount, setQuestionCount] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (isUnlocked) {
+      getChapterQuestionCount(chapter.id).then(setQuestionCount);
+    }
+  }, [chapter.id, isUnlocked]);
+
+  return (
+    <Card
+      className={`border-border hover:border-primary/50 transition-colors cursor-pointer ${
+        !isUnlocked ? "opacity-75" : ""
+      }`}
+      onClick={() => isUnlocked && onClick()}
+    >
+      <CardHeader className="pb-3">
+        <div className="flex items-start justify-between">
+          <div className="flex items-center gap-3">
+            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-sm font-medium text-primary">
+              {index + 1}
+            </span>
+            <CardTitle className="text-base leading-snug">{chapter.name}</CardTitle>
+          </div>
+          {!isUnlocked && <Lock className="h-4 w-4 text-muted-foreground flex-shrink-0" />}
+        </div>
+      </CardHeader>
+      <CardContent>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <BookOpen className="h-4 w-4 text-muted-foreground" />
+            <span className="text-sm text-muted-foreground">
+              {questionCount !== null ? `${questionCount} MCQs` : `${chapter.questionCount} MCQs`}
+            </span>
+          </div>
+          <Badge variant="secondary" className="text-xs">PYQ + NCERT</Badge>
+        </div>
+        <Button
+          className="w-full mt-4"
+          variant={isUnlocked ? "default" : "secondary"}
+          disabled={!isUnlocked}
+          onClick={(e) => {
+            e.stopPropagation();
+            isUnlocked && onClick();
+          }}
+        >
+          {isUnlocked ? (
+            <><Play className="h-4 w-4 mr-2" />Select Set</>
+          ) : "Unlock Premium"}
+        </Button>
+      </CardContent>
+    </Card>
+  );
+}
+
+export function ChapterSelector({
+  onSelectChapter,
+  onStartDemo,
+  onStartPYQYear,
+  onStartPYQChapter,
+  isPaidUser,
+}: ChapterSelectorProps) {
   const [activeTab, setActiveTab] = useState<"11" | "12" | "pyq">("11");
   const [selectedChapter, setSelectedChapter] = useState<{ id: number; name: string } | null>(null);
   const [sets, setSets] = useState<SetInfo[]>([]);
+  const [setsLoading, setSetsLoading] = useState(false);
 
-  const chapters = activeTab === "11" ? class11Chapters : class12Chapters;
-
-  const handleChapterClick = (chapter: { id: number; name: string }) => {
-    const chapterSets = getSetsForChapter(chapter.id);
+  const handleChapterClick = async (chapter: { id: number; name: string }) => {
     setSelectedChapter(chapter);
+    setSets([]);
+    setSetsLoading(true);
+    const chapterSets = await getSetsForChapter(chapter.id);
     setSets(chapterSets);
+    setSetsLoading(false);
   };
 
   const handleSetClick = (setNumber: number) => {
@@ -350,36 +355,34 @@ export function ChapterSelector({ onSelectChapter, onStartDemo, isPaidUser }: Ch
     <div className="container mx-auto px-4 py-8">
       <div className="text-center mb-8">
         <h1 className="text-3xl font-bold text-foreground mb-2">Chapter-wise Practice</h1>
-        <p className="text-muted-foreground">
-          Select a chapter to start practicing NCERT-based MCQs
-        </p>
+        <p className="text-muted-foreground">Select a chapter to start practicing NCERT-based MCQs</p>
       </div>
 
       {/* Demo Section */}
       {!isPaidUser && (
-      <Card className="mb-8 border-primary/50 bg-primary/5">
-        <CardContent className="py-6">
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div className="flex items-center gap-4">
-              <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center">
-                <Sparkles className="h-6 w-6 text-primary" />
+        <Card className="mb-8 border-primary/50 bg-primary/5">
+          <CardContent className="py-6">
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div className="flex items-center gap-4">
+                <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center">
+                  <Sparkles className="h-6 w-6 text-primary" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-foreground">Try Demo Questions</h3>
+                  <p className="text-sm text-muted-foreground">
+                    10 sample questions from various chapters - no login required
+                  </p>
+                </div>
               </div>
-              <div>
-                <h3 className="font-semibold text-foreground">Try Demo Questions</h3>
-                <p className="text-sm text-muted-foreground">
-                  10 sample questions from various chapters - no login required
-                </p>
-              </div>
+              <Button onClick={onStartDemo} className="gap-2">
+                <Play className="h-4 w-4" />
+                Start Demo
+              </Button>
             </div>
-            <Button onClick={onStartDemo} className="gap-2">
-              <Play className="h-4 w-4" />
-              Start Demo
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
       )}
-      
+
       {/* Set Selector Modal */}
       {selectedChapter && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
@@ -387,23 +390,22 @@ export function ChapterSelector({ onSelectChapter, onStartDemo, isPaidUser }: Ch
             <CardHeader>
               <div className="flex items-center justify-between">
                 <CardTitle className="text-lg">{selectedChapter.name}</CardTitle>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => setSelectedChapter(null)}
-                >
+                <Button variant="ghost" size="icon" onClick={() => setSelectedChapter(null)}>
                   <X className="h-4 w-4" />
                 </Button>
               </div>
               <p className="text-sm text-muted-foreground">Select a set to practice</p>
             </CardHeader>
             <CardContent className="space-y-3">
-              {sets.length === 0 ? (
+              {setsLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                  <span className="ml-2 text-muted-foreground text-sm">Loading sets...</span>
+                </div>
+              ) : sets.length === 0 ? (
                 <div className="text-center py-6">
                   <p className="text-muted-foreground text-sm">No questions available yet.</p>
-                  <p className="text-muted-foreground text-xs mt-1">
-                    Admin can add questions from the admin panel.
-                  </p>
+                  <p className="text-muted-foreground text-xs mt-1">Admin can add questions from the admin panel.</p>
                 </div>
               ) : (
                 sets.map((set) => (
@@ -414,18 +416,11 @@ export function ChapterSelector({ onSelectChapter, onStartDemo, isPaidUser }: Ch
                   >
                     <div className="flex items-center gap-3">
                       <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
-                        <span className="text-sm font-bold text-primary">
-                          {set.label === "PYQ Set" ? "PYQ" : set.setNumber}
-                        </span>
+                        <span className="text-sm font-bold text-primary">{set.setNumber}</span>
                       </div>
                       <div className="text-left">
                         <p className="font-medium text-foreground">{set.label}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {set.questionCount} questions
-                          {set.type === "manual" && (
-                            <span className="ml-2 text-blue-500">• Custom Set</span>
-                          )}
-                        </p>
+                        <p className="text-xs text-muted-foreground">{set.questionCount} questions</p>
                       </div>
                     </div>
                     <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
@@ -437,7 +432,7 @@ export function ChapterSelector({ onSelectChapter, onStartDemo, isPaidUser }: Ch
         </div>
       )}
 
-      {/* Three Tabs */}
+      {/* Tabs */}
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "11" | "12" | "pyq")}>
         <div className="overflow-x-auto mb-8">
           <TabsList className="grid w-full max-w-lg mx-auto grid-cols-3 min-w-[320px]">
@@ -447,130 +442,50 @@ export function ChapterSelector({ onSelectChapter, onStartDemo, isPaidUser }: Ch
           </TabsList>
         </div>
 
-        {/* Class 11 Tab */}
         <TabsContent value="11">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {class11Chapters.map((chapter, index) => {
-              const isUnlocked = isPaidUser || index < 2;
-              return (
-                <Card
-                  key={chapter.id}
-                  className={`border-border hover:border-primary/50 transition-colors cursor-pointer ${
-                    !isUnlocked ? "opacity-75" : ""
-                  }`}
-                  onClick={() => isUnlocked && handleChapterClick(chapter)}
-                >
-                  <CardHeader className="pb-3">
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-center gap-3">
-                        <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-sm font-medium text-primary">
-                          {index + 1}
-                        </span>
-                        <CardTitle className="text-base leading-snug">{chapter.name}</CardTitle>
-                      </div>
-                      {!isUnlocked && <Lock className="h-4 w-4 text-muted-foreground flex-shrink-0" />}
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <BookOpen className="h-4 w-4 text-muted-foreground" />
-                        <span className="text-sm text-muted-foreground">{chapter.questionCount} MCQs</span>
-                      </div>
-                      <Badge variant="secondary" className="text-xs">PYQ + NCERT</Badge>
-                    </div>
-                    <Button
-                      className="w-full mt-4"
-                      variant={isUnlocked ? "default" : "secondary"}
-                      disabled={!isUnlocked}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        isUnlocked && handleChapterClick(chapter);
-                      }}
-                    >
-                      {isUnlocked ? (
-                        <><Play className="h-4 w-4 mr-2" />Select Set</>
-                      ) : (
-                        "Unlock Premium"
-                      )}
-                    </Button>
-                  </CardContent>
-                </Card>
-              );
-            })}
+            {class11Chapters.map((chapter, index) => (
+              <ChapterCard
+                key={chapter.id}
+                chapter={chapter}
+                index={index}
+                isUnlocked={isPaidUser || index < 2}
+                onClick={() => handleChapterClick(chapter)}
+              />
+            ))}
           </div>
         </TabsContent>
 
-        {/* Class 12 Tab */}
         <TabsContent value="12">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {class12Chapters.map((chapter, index) => {
-              const isUnlocked = isPaidUser || index < 2;
-              return (
-                <Card
-                  key={chapter.id}
-                  className={`border-border hover:border-primary/50 transition-colors cursor-pointer ${
-                    !isUnlocked ? "opacity-75" : ""
-                  }`}
-                  onClick={() => isUnlocked && handleChapterClick(chapter)}
-                >
-                  <CardHeader className="pb-3">
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-center gap-3">
-                        <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-sm font-medium text-primary">
-                          {index + 1}
-                        </span>
-                        <CardTitle className="text-base leading-snug">{chapter.name}</CardTitle>
-                      </div>
-                      {!isUnlocked && <Lock className="h-4 w-4 text-muted-foreground flex-shrink-0" />}
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <BookOpen className="h-4 w-4 text-muted-foreground" />
-                        <span className="text-sm text-muted-foreground">{chapter.questionCount} MCQs</span>
-                      </div>
-                      <Badge variant="secondary" className="text-xs">PYQ + NCERT</Badge>
-                    </div>
-                    <Button
-                      className="w-full mt-4"
-                      variant={isUnlocked ? "default" : "secondary"}
-                      disabled={!isUnlocked}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        isUnlocked && handleChapterClick(chapter);
-                      }}
-                    >
-                      {isUnlocked ? (
-                        <><Play className="h-4 w-4 mr-2" />Select Set</>
-                      ) : (
-                        "Unlock Premium"
-                      )}
-                    </Button>
-                  </CardContent>
-                </Card>
-              );
-            })}
+            {class12Chapters.map((chapter, index) => (
+              <ChapterCard
+                key={chapter.id}
+                chapter={chapter}
+                index={index}
+                isUnlocked={isPaidUser || index < 2}
+                onClick={() => handleChapterClick(chapter)}
+              />
+            ))}
           </div>
         </TabsContent>
 
-        {/* PYQ Tab */}
         <TabsContent value="pyq">
-          <PYQTab onSelectChapter={onSelectChapter} isPaidUser={isPaidUser} />
+          <PYQTab
+            onStartPYQYear={onStartPYQYear}
+            onStartPYQChapter={onStartPYQChapter}
+            isPaidUser={isPaidUser}
+          />
         </TabsContent>
       </Tabs>
 
-      {/* Premium Prompt for Class tabs */}
       {!isPaidUser && activeTab !== "pyq" && (
         <div className="mt-8 p-6 bg-secondary/50 rounded-lg text-center">
           <p className="text-foreground font-medium mb-2">Unlock all 38 chapters with Premium</p>
           <p className="text-muted-foreground text-sm mb-4">
             Get access to 3800+ MCQs, mock tests, and detailed analytics
           </p>
-          <Button asChild>
-            <a href="/pricing">View Pricing</a>
-          </Button>
+          <Button asChild><a href="/pricing">View Pricing</a></Button>
         </div>
       )}
     </div>

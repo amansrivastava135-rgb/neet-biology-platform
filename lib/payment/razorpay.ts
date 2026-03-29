@@ -7,8 +7,12 @@ const razorpay = new Razorpay({
 });
 
 export function createOrder(amount: number, currency = "INR", receipt?: string) {
-  // when keys are not configured we return a dummy order for local testing
   if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_SECRET) {
+    // Production mein error throw karo
+    if (process.env.NODE_ENV === "production") {
+      throw new Error("Razorpay keys not configured!");
+    }
+    // Sirf development mein dummy order
     return Promise.resolve({ id: `test_order_${Date.now()}`, amount, currency });
   }
 
@@ -25,14 +29,23 @@ export function verifySignature(params: {
   razorpay_payment_id: string;
   razorpay_signature: string;
 }) {
-  // if there is no secret configured, simply trust the request (dev mode)
-  if (!process.env.RAZORPAY_SECRET) {
+  const secret = process.env.RAZORPAY_SECRET;
+
+  // Production mein secret hona zaroori hai
+  if (!secret) {
+    if (process.env.NODE_ENV === "production") {
+      throw new Error("Razorpay secret not configured!");
+    }
+    // Sirf development mein bypass
+    console.warn("⚠️ Razorpay secret missing — bypassing in dev mode");
     return true;
   }
+
   const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = params;
   const generated = crypto
-    .createHmac("sha256", process.env.RAZORPAY_SECRET || "")
+    .createHmac("sha256", secret)
     .update(razorpay_order_id + "|" + razorpay_payment_id)
     .digest("hex");
+
   return generated === razorpay_signature;
 }

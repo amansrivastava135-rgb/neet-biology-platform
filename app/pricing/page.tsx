@@ -80,11 +80,12 @@ function PricingContent() {
           const verifyRes = await fetch("/api/payment/verify", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              razorpay_order_id: response.razorpay_order_id,
-              razorpay_payment_id: response.razorpay_payment_id,
-              razorpay_signature: response.razorpay_signature,
-            }),
+           body: JSON.stringify({
+  razorpay_order_id: response.razorpay_order_id,
+  razorpay_payment_id: response.razorpay_payment_id,
+  razorpay_signature: response.razorpay_signature,
+  email: user.email,
+}),
           }).then((r) => r.json());
 
           if (verifyRes.success) {

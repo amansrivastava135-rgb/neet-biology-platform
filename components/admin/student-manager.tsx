@@ -35,8 +35,24 @@ export function StudentManager() {
   const [students, setStudents] = useState<StudentData[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
+  const [loadingEmail, setLoadingEmail] = useState<string | null>(null);
 
-  const loadStudents = () => {
+  const loadStudents = async () => {
+    // Supabase se students load karo
+    try {
+      const res = await fetch("/api/admin/students");
+      if (res.ok) {
+        const data = await res.json();
+        if (data.students) {
+          setStudents(data.students);
+          return;
+        }
+      }
+    } catch (err) {
+      console.error("Supabase load failed, falling back to localStorage", err);
+    }
+
+    // Fallback: localStorage se load karo
     const registeredUsers = JSON.parse(
       localStorage.getItem("neet_registered_users") || "{}"
     );
@@ -59,53 +75,87 @@ export function StudentManager() {
     loadStudents();
   }, []);
 
-  const handleGivePremium = (email: string) => {
-    const registeredUsers = JSON.parse(
-      localStorage.getItem("neet_registered_users") || "{}"
-    );
-    if (registeredUsers[email]) {
-      const now = new Date();
-      const expiry = new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000);
-      registeredUsers[email].user = {
-        ...registeredUsers[email].user,
-        isPaid: true,
-        subscriptionPlan: "premium",
-        subscription: "active",
-        subscriptionStart: now.toISOString(),
-        subscriptionEnd: expiry.toISOString(),
-        plan: "premium",
-      };
-      localStorage.setItem("neet_registered_users", JSON.stringify(registeredUsers));
-      loadStudents();
-      // If this student is currently logged in, update their session too
-      const currentUser = localStorage.getItem("neet_user");
-      if (currentUser) {
-        const user = JSON.parse(currentUser);
-        if (user.email === email) {
-          const updatedUser = registeredUsers[email].user;
-          localStorage.setItem("neet_user", JSON.stringify(updatedUser));
-          document.cookie = `neet_user=${encodeURIComponent(JSON.stringify(updatedUser))}; path=/; max-age=${60 * 60 * 24 * 365}`;
+  const handleGivePremium = async (email: string) => {
+    setLoadingEmail(email);
+    try {
+      const res = await fetch("/api/admin/grant-premium", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, action: "grant" }),
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        // localStorage bhi update karo (agar same browser mein logged in ho)
+        const registeredUsers = JSON.parse(
+          localStorage.getItem("neet_registered_users") || "{}"
+        );
+        if (registeredUsers[email]) {
+          const now = new Date();
+          const expiry = new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000);
+          registeredUsers[email].user = {
+            ...registeredUsers[email].user,
+            isPaid: true,
+            subscriptionPlan: "premium",
+            subscription: "active",
+            subscriptionStart: now.toISOString(),
+            subscriptionEnd: expiry.toISOString(),
+            plan: "premium",
+          };
+          localStorage.setItem(
+            "neet_registered_users",
+            JSON.stringify(registeredUsers)
+          );
         }
+        await loadStudents();
+        alert(`✅ Premium activated for ${email}!`);
+      } else {
+        alert(`❌ Error: ${data.error}`);
       }
-      alert(`✅ Premium activated for ${email}!`);
+    } catch (err) {
+      alert("❌ Network error. Please try again.");
+    } finally {
+      setLoadingEmail(null);
     }
   };
 
-  const handleRevokePremium = (email: string) => {
-    const registeredUsers = JSON.parse(
-      localStorage.getItem("neet_registered_users") || "{}"
-    );
-    if (registeredUsers[email]) {
-      registeredUsers[email].user = {
-        ...registeredUsers[email].user,
-        isPaid: false,
-        subscriptionPlan: "free",
-        subscription: "free",
-        subscriptionEnd: undefined,
-      };
-      localStorage.setItem("neet_registered_users", JSON.stringify(registeredUsers));
-      loadStudents();
-      alert(`❌ Premium revoked for ${email}!`);
+  const handleRevokePremium = async (email: string) => {
+    setLoadingEmail(email);
+    try {
+      const res = await fetch("/api/admin/grant-premium", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, action: "revoke" }),
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        // localStorage bhi update karo
+        const registeredUsers = JSON.parse(
+          localStorage.getItem("neet_registered_users") || "{}"
+        );
+        if (registeredUsers[email]) {
+          registeredUsers[email].user = {
+            ...registeredUsers[email].user,
+            isPaid: false,
+            subscriptionPlan: "free",
+            subscription: "free",
+            subscriptionEnd: undefined,
+          };
+          localStorage.setItem(
+            "neet_registered_users",
+            JSON.stringify(registeredUsers)
+          );
+        }
+        await loadStudents();
+        alert(`✅ Premium revoked for ${email}!`);
+      } else {
+        alert(`❌ Error: ${data.error}`);
+      }
+    } catch (err) {
+      alert("❌ Network error. Please try again.");
+    } finally {
+      setLoadingEmail(null);
     }
   };
 
@@ -133,7 +183,9 @@ export function StudentManager() {
                 <Users className="h-5 w-5 text-blue-500" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-foreground">{students.length}</p>
+                <p className="text-2xl font-bold text-foreground">
+                  {students.length}
+                </p>
                 <p className="text-sm text-muted-foreground">Total Students</p>
               </div>
             </div>
@@ -221,17 +273,27 @@ export function StudentManager() {
                 <TableBody>
                   {filteredStudents.map((student) => (
                     <TableRow key={student.id}>
-                      <TableCell className="font-medium">{student.name}</TableCell>
-                      <TableCell className="text-muted-foreground">{student.email}</TableCell>
+                      <TableCell className="font-medium">
+                        {student.name}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {student.email}
+                      </TableCell>
                       <TableCell>
-                        <Badge variant={student.isPaid ? "default" : "secondary"}>
+                        <Badge
+                          variant={student.isPaid ? "default" : "secondary"}
+                        >
                           {student.isPaid ? "Premium" : "Free"}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-muted-foreground">{student.joinedAt}</TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {student.joinedAt}
+                      </TableCell>
                       <TableCell className="text-muted-foreground">
                         {student.subscriptionEnd
-                          ? new Date(student.subscriptionEnd).toLocaleDateString()
+                          ? new Date(
+                              student.subscriptionEnd
+                            ).toLocaleDateString()
                           : "—"}
                       </TableCell>
                       <TableCell>
@@ -240,18 +302,24 @@ export function StudentManager() {
                             variant="destructive"
                             size="sm"
                             onClick={() => handleRevokePremium(student.email)}
+                            disabled={loadingEmail === student.email}
                           >
-                            Revoke
+                            {loadingEmail === student.email
+                              ? "Revoking..."
+                              : "Revoke"}
                           </Button>
                         ) : (
                           <Button
                             variant="default"
                             size="sm"
                             onClick={() => handleGivePremium(student.email)}
+                            disabled={loadingEmail === student.email}
                             className="gap-1"
                           >
                             <Crown className="h-3 w-3" />
-                            Give Premium
+                            {loadingEmail === student.email
+                              ? "Granting..."
+                              : "Give Premium"}
                           </Button>
                         )}
                       </TableCell>

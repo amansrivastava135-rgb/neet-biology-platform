@@ -6,7 +6,7 @@
 export const PRICING = {
   premium: {
     id: "premium",
-    price: 1,
+    price: 499,
     currency: "INR",
     durationDays: 365,
     label: "1 Year Access",

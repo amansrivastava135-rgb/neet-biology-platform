@@ -9,22 +9,25 @@ type PricingCardProps = {
   plan: "free" | "premium";
   features: Array<{ name: string; included: boolean | string }>;
   userIsPaid?: boolean;
+  userLoggedIn?: boolean;
   onBuy?: () => void;
 };
 
-export function PricingCard({ plan, features, userIsPaid, onBuy }: PricingCardProps) {
+export function PricingCard({ plan, features, userIsPaid, userLoggedIn, onBuy }: PricingCardProps) {
   const isPremium = plan === "premium";
   const priceLabel = isPremium ? `₹${PRICING.premium.price}` : "Rs.0";
   const periodLabel = isPremium ? PRICING.premium.label : "/forever";
 
   return (
-    <Card className={isPremium ? "border-primary shadow-lg" : "border-border"}>
+    <Card className={`relative ${isPremium ? "border-primary shadow-lg" : "border-border"}`}>
       {isPremium && (
         <Badge className="absolute -top-3 left-1/2 -translate-x-1/2">Most Popular</Badge>
       )}
       <CardHeader className="text-center pb-4">
         <CardTitle className="text-2xl">{isPremium ? "Premium" : "Free"}</CardTitle>
-        <CardDescription>{isPremium ? PRICING.premium.description : "Try before you commit"}</CardDescription>
+        <CardDescription>
+          {isPremium ? PRICING.premium.description : "Try before you commit"}
+        </CardDescription>
         <div className="mt-4">
           <span className="text-4xl font-bold text-foreground">{priceLabel}</span>
           <span className="block text-sm text-muted-foreground mt-1">{periodLabel}</span>
@@ -45,16 +48,30 @@ export function PricingCard({ plan, features, userIsPaid, onBuy }: PricingCardPr
             </li>
           ))}
         </ul>
+
         {isPremium ? (
           userIsPaid ? (
-            <Button className="w-full" disabled>Already Subscribed</Button>
+            <Button className="w-full" disabled>
+              ✅ Already Subscribed
+            </Button>
           ) : (
-            <Button className="w-full" onClick={onBuy}>Buy Now</Button>
+            <Button className="w-full" onClick={onBuy}>
+              Buy Now
+            </Button>
           )
         ) : (
-          <Button className="w-full" variant="outline" asChild>
-            <Link href="/signup">Get Started Free</Link>
-          </Button>
+          // Free card button
+          userLoggedIn ? (
+            // Logged in user → Practice page
+            <Button className="w-full" variant="outline" asChild>
+              <Link href="/practice">Start Practicing</Link>
+            </Button>
+          ) : (
+            // Not logged in → Signup
+            <Button className="w-full" variant="outline" asChild>
+              <Link href="/signup">Get Started Free</Link>
+            </Button>
+          )
         )}
       </CardContent>
     </Card>

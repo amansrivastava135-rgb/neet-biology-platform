@@ -139,22 +139,24 @@ function PricingContent() {
           </div>
 
           {/* Pricing Cards */}
-          {error && (
-            <div className="mb-4 text-center text-red-600">{error}</div>
-          )}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto mb-16">
-            <PricingCard
-              plan="free"
-              features={features.map((f) => ({ name: f.name, included: f.free }))}
-              userIsPaid={isPaid}
-            />
-            <PricingCard
-              plan="premium"
-              features={features.map((f) => ({ name: f.name, included: f.premium }))}
-              userIsPaid={isPaid}
-              onBuy={handleBuy}
-            />
-          </div>
+<div className={`grid gap-8 max-w-4xl mx-auto mb-16 ${isPaid ? "grid-cols-1 max-w-md" : "grid-cols-1 md:grid-cols-2"}`}>
+  {/* Free card — sirf non-premium users ko dikhao */}
+  {!isPaid && (
+    <PricingCard
+      plan="free"
+      features={features.map((f) => ({ name: f.name, included: f.free }))}
+      userIsPaid={isPaid}
+      userLoggedIn={!!user}
+    />
+  )}
+  <PricingCard
+    plan="premium"
+    features={features.map((f) => ({ name: f.name, included: f.premium }))}
+    userIsPaid={isPaid}
+    userLoggedIn={!!user}
+    onBuy={handleBuy}
+  />
+</div>
 
           {/* Features Section */}
           <div className="mb-16">

@@ -1,8 +1,14 @@
 ﻿"use client";
 
-import { useMemo } from "react";
+import { useEffect, useState } from "react";
 import { TestEngine, TestSubmitPayload } from "@/components/test-engine/TestEngine";
-import { sampleQuestions, class11Chapters, class12Chapters, type Question } from "@/lib/data";
+import { class11Chapters, class12Chapters, type Question } from "@/lib/data";
+import { createClient } from "@supabase/supabase-js";
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
 
 type MockTestInterfaceProps = {
   testType: "full" | "preview";
@@ -21,87 +27,155 @@ function shuffleArray<T>(array: T[]): T[] {
   return shuffled;
 }
 
-function getAllQuestions(): Question[] {
-  let adminQuestions: Question[] = [];
-  try {
-    if (typeof window !== "undefined") {
-      const stored = window.localStorage.getItem("neet_admin_questions");
-      if (stored) adminQuestions = JSON.parse(stored);
-    }
-  } catch {}
-  return [...adminQuestions, ...sampleQuestions];
+function convertToQuestion(q: any): Question {
+  return {
+    id: q.id,
+    question: q.question,
+    options: { A: q.option_a, B: q.option_b, C: q.option_c, D: q.option_d },
+    correctAnswer: q.correct_answer,
+    explanation: q.explanation,
+    chapterId: q.chapter_id,
+    chapterName: q.chapter_name,
+    source: q.source,
+    year: q.year,
+  };
 }
 
-function getManualMockTest(mockTestId: string): Question[] {
-  try {
-    if (typeof window !== "undefined") {
-      const stored = window.localStorage.getItem("neet_manual_mock_tests");
-      if (stored) {
-        const tests = JSON.parse(stored);
-        const test = tests.find((t: any) => t.id === mockTestId);
-        if (test) return test.questions;
+export function MockTestInterface({
+  testType,
+  onSubmit,
+  isPaidUser,
+  mockTestId,
+  autoTestIndex,
+}: MockTestInterfaceProps) {
+  const [questions, setQuestions] = useState<Question[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [testLabel, setTestLabel] = useState("");
+
+  useEffect(() => {
+    async function loadQuestions() {
+      setIsLoading(true);
+
+      // Specific mock test from Supabase
+      if (mockTestId) {
+        const { data: mockTest } = await supabase
+          .from("mock_tests")
+          .select("*")
+          .eq("id", mockTestId)
+          .single();
+
+        if (mockTest && mockTest.question_ids?.length > 0) {
+          const { data: qs } = await supabase
+            .from("questions")
+            .select("*")
+            .in("id", mockTest.question_ids);
+
+          if (qs) {
+            setQuestions(qs.map(convertToQuestion));
+            setTestLabel(mockTest.name);
+          }
+        }
+        setIsLoading(false);
+        return;
       }
+
+      // Demo test — 10 random questions
+      if (testType === "preview") {
+        const { data } = await supabase
+          .from("questions")
+          .select("*")
+          .limit(100);
+
+        if (data) {
+          const shuffled = shuffleArray(data).slice(0, 10);
+          setQuestions(shuffled.map(convertToQuestion));
+          setTestLabel("Demo Test");
+        }
+        setIsLoading(false);
+        return;
+      }
+
+      // Full mock test — 50% Class 11 + 50% Class 12
+      const class11Ids = class11Chapters.map((c) => c.id);
+      const class12Ids = class12Chapters.map((c) => c.id);
+
+      const { data: class11Data } = await supabase
+        .from("questions")
+        .select("*")
+        .in("chapter_id", class11Ids);
+
+      const { data: class12Data } = await supabase
+        .from("questions")
+        .select("*")
+        .in("chapter_id", class12Ids);
+
+      const class11Questions = class11Data || [];
+      const class12Questions = class12Data || [];
+
+      // 45 from Class 11 — balanced across chapters
+      const selected11: any[] = [];
+      const perChapter11 = Math.ceil(45 / class11Ids.length);
+      class11Ids.forEach((id) => {
+        const chapterQs = shuffleArray(
+          class11Questions.filter((q) => q.chapter_id === id)
+        );
+        selected11.push(...chapterQs.slice(0, perChapter11));
+      });
+
+      // 45 from Class 12 — balanced across chapters
+      const selected12: any[] = [];
+      const perChapter12 = Math.ceil(45 / class12Ids.length);
+      class12Ids.forEach((id) => {
+        const chapterQs = shuffleArray(
+          class12Questions.filter((q) => q.chapter_id === id)
+        );
+        selected12.push(...chapterQs.slice(0, perChapter12));
+      });
+
+      const final11 = shuffleArray(selected11).slice(0, 45);
+      const final12 = shuffleArray(selected12).slice(0, 45);
+      const finalQuestions = shuffleArray([...final11, ...final12]);
+
+      setQuestions(finalQuestions.map(convertToQuestion));
+      setTestLabel(
+        autoTestIndex !== undefined
+          ? `Mock Test ${autoTestIndex + 1}`
+          : "Full Mock Test — 90 Questions (50% Class 11 + 50% Class 12)"
+      );
+      setIsLoading(false);
     }
-  } catch {}
-  return [];
-}
 
-function getQuestionsForMockTest(testType: "full" | "preview", mockTestId?: string): Question[] {
-  // Manual mock test
-  if (mockTestId) {
-    return getManualMockTest(mockTestId);
-  }
-
-  const allQuestions = getAllQuestions();
-
-  if (testType === "preview") {
-    return shuffleArray(allQuestions).slice(0, 10);
-  }
-
-  // Class 11 chapter IDs
-  const class11Ids = class11Chapters.map((c) => c.id);
-  // Class 12 chapter IDs
-  const class12Ids = class12Chapters.map((c) => c.id);
-
-  const class11Questions = allQuestions.filter((q) => class11Ids.includes(q.chapterId));
-  const class12Questions = allQuestions.filter((q) => class12Ids.includes(q.chapterId));
-
-  // 45 from Class 11 — balanced across chapters
-  const selected11: Question[] = [];
-  const questionsPerClass11Chapter = Math.ceil(45 / class11Ids.length);
-  class11Ids.forEach((id) => {
-    const chapterQs = shuffleArray(class11Questions.filter((q) => q.chapterId === id));
-    selected11.push(...chapterQs.slice(0, questionsPerClass11Chapter));
-  });
-
-  // 45 from Class 12 — balanced across chapters
-  const selected12: Question[] = [];
-  const questionsPerClass12Chapter = Math.ceil(45 / class12Ids.length);
-  class12Ids.forEach((id) => {
-    const chapterQs = shuffleArray(class12Questions.filter((q) => q.chapterId === id));
-    selected12.push(...chapterQs.slice(0, questionsPerClass12Chapter));
-  });
-
-  // Shuffle and take exactly 45 from each
-  const final11 = shuffleArray(selected11).slice(0, 45);
-  const final12 = shuffleArray(selected12).slice(0, 45);
-
-  // Combine and shuffle final 90
-  return shuffleArray([...final11, ...final12]);
-}
-
-export function MockTestInterface({ testType, onSubmit, isPaidUser, mockTestId }: MockTestInterfaceProps) {
-  const testSeed = useMemo(() => Date.now(), []);
-
-  const questions = useMemo<Question[]>(
-    () => getQuestionsForMockTest(testType, mockTestId),
-    [testType, mockTestId, testSeed]
-  );
+    loadQuestions();
+  }, [testType, mockTestId, autoTestIndex]);
 
   const totalTime = testType === "full" ? 90 * 60 : 10 * 60;
   const storageKey = mockTestId
-    ? `neet-mock-test-manual-${mockTestId}`
-    : `neet-mock-test-${testType}`;
+    ? `neet-mock-${mockTestId}`
+    : `neet-mock-${testType}-${autoTestIndex ?? 0}`;
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="h-8 w-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-muted-foreground">Loading questions...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (questions.length === 0) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <p className="text-muted-foreground text-lg mb-4">No questions available.</p>
+          <p className="text-sm text-muted-foreground">
+            Admin se request karo questions add karne ke liye!
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <TestEngine
@@ -110,13 +184,7 @@ export function MockTestInterface({ testType, onSubmit, isPaidUser, mockTestId }
       storageKey={storageKey}
       onSubmit={onSubmit}
       isPaidUser={isPaidUser}
-      testLabel={
-        mockTestId
-          ? "Custom Mock Test"
-          : testType === "full"
-          ? "Full Mock Test — 90 Questions (50% Class 11 + 50% Class 12)"
-          : "Demo Test"
-      }
+      testLabel={testLabel}
       initialTestType={testType}
     />
   );

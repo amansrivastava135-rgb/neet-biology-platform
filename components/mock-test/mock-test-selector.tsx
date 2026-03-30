@@ -8,27 +8,21 @@ import { Clock, FileQuestion, Lock, Play, Sparkles, Target } from "lucide-react"
 import Link from "next/link";
 import { getRemainingDays } from "@/lib/subscription-utils";
 import { useAuth } from "@/lib/auth-context";
-import { sampleQuestions } from "@/lib/data";
 import { LeaderboardTable } from "@/components/leaderboard/LeaderboardTable";
+import { createClient } from "@supabase/supabase-js";
 
-const QUESTIONS_PER_TEST = 90;
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
 
-type AutoMockTest = {
+type MockTest = {
   id: string;
   name: string;
-  startIndex: number;
-  endIndex: number;
-  questionCount: number;
-};
-
-type ManualMockTest = {
-  id: string;
-  name: string;
-  description: string;
-  questions: any[];
-  createdAt: string;
-  class11Count: number;
-  class12Count: number;
+  question_ids: number[];
+  class11_count: number;
+  class12_count: number;
+  created_at: string;
 };
 
 type MockTestSelectorProps = {
@@ -36,46 +30,22 @@ type MockTestSelectorProps = {
   isPaidUser: boolean;
 };
 
-function getTotalAvailableQuestions(): number {
-  let adminQuestions: any[] = [];
-  try {
-    const stored = localStorage.getItem("neet_admin_questions");
-    if (stored) adminQuestions = JSON.parse(stored);
-  } catch {}
-  return adminQuestions.length + sampleQuestions.length;
-}
-
-function generateAutoMockTests(): AutoMockTest[] {
-  const total = getTotalAvailableQuestions();
-  const tests: AutoMockTest[] = [];
-  const totalTests = Math.max(1, Math.ceil(total / QUESTIONS_PER_TEST));
-
-  for (let i = 0; i < totalTests; i++) {
-    const start = i * QUESTIONS_PER_TEST;
-    const end = Math.min(start + QUESTIONS_PER_TEST, total);
-    tests.push({
-      id: `auto-${i + 1}`,
-      name: `Mock Test ${i + 1}`,
-      startIndex: start,
-      endIndex: end,
-      questionCount: end - start,
-    });
-  }
-  return tests;
-}
-
 export function MockTestSelector({ onStartTest, isPaidUser }: MockTestSelectorProps) {
   const { user } = useAuth();
   const remainingDays = user ? getRemainingDays(user) : 0;
-  const [manualTests, setManualTests] = useState<ManualMockTest[]>([]);
-  const [autoTests, setAutoTests] = useState<AutoMockTest[]>([]);
+  const [mockTests, setMockTests] = useState<MockTest[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    try {
-      const stored = localStorage.getItem("neet_manual_mock_tests");
-      if (stored) setManualTests(JSON.parse(stored));
-    } catch {}
-    setAutoTests(generateAutoMockTests());
+    async function fetchMockTests() {
+      const { data } = await supabase
+        .from("mock_tests")
+        .select("*")
+        .order("created_at", { ascending: true });
+      if (data) setMockTests(data);
+      setIsLoading(false);
+    }
+    fetchMockTests();
   }, []);
 
   return (
@@ -97,8 +67,8 @@ export function MockTestSelector({ onStartTest, isPaidUser }: MockTestSelectorPr
         )}
       </div>
 
-      {/* Top Cards — Demo only for free users */}
-      <div className={`grid grid-cols-1 ${!isPaidUser ? 'md:grid-cols-2' : 'md:grid-cols-1'} gap-6 max-w-4xl mx-auto mb-10`}>
+      {/* Top Cards */}
+      <div className={`grid grid-cols-1 ${!isPaidUser ? "md:grid-cols-2" : "md:grid-cols-1"} gap-6 max-w-4xl mx-auto mb-10`}>
         {!isPaidUser && (
           <Card className="border-primary/50 bg-primary/5">
             <CardHeader>
@@ -143,38 +113,56 @@ export function MockTestSelector({ onStartTest, isPaidUser }: MockTestSelectorPr
         </Card>
       </div>
 
-      {/* Auto Generated Mock Tests */}
+      {/* Mock Tests — Premium only */}
       {isPaidUser ? (
         <div className="max-w-4xl mx-auto mb-10">
           <h2 className="text-xl font-bold text-foreground mb-4">
             Available Mock Tests
-            <Badge variant="secondary" className="ml-2">{autoTests.length}</Badge>
+            <Badge variant="secondary" className="ml-2">
+              {isLoading ? "..." : mockTests.length}
+            </Badge>
           </h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {autoTests.map((test, index) => (
-              <Card key={test.id} className="border-border hover:border-primary/50 transition-colors">
-                <CardContent className="pt-6">
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="font-medium text-foreground">{test.name}</span>
-                    <Badge variant="outline">{test.questionCount} Qs</Badge>
-                  </div>
-                  <div className="flex items-center gap-2 mb-4 text-xs text-muted-foreground">
-                    <Clock className="h-3 w-3" />
-                    <span>90 Minutes</span>
-                    <Target className="h-3 w-3 ml-2" />
-                    <span>Full Syllabus</span>
-                  </div>
-                  <Button
-                    className="w-full gap-2"
-                    onClick={() => onStartTest("full", undefined, index)}
-                  >
-                    <Play className="h-4 w-4" />
-                    Start Test
-                  </Button>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+
+          {isLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="h-6 w-6 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+              <span className="ml-3 text-muted-foreground">Loading tests...</span>
+            </div>
+          ) : mockTests.length === 0 ? (
+            <div className="text-center py-12 bg-muted/30 rounded-lg">
+              <p className="text-muted-foreground">No mock tests available yet.</p>
+              <p className="text-sm text-muted-foreground mt-1">Admin will add tests soon!</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {mockTests.map((test) => (
+                <Card
+                  key={test.id}
+                  className="border-border hover:border-primary/50 transition-colors"
+                >
+                  <CardContent className="pt-6">
+                    <div className="flex items-center justify-between mb-3">
+                      <span className="font-medium text-foreground">{test.name}</span>
+                      <Badge variant="outline">{test.question_ids.length} Qs</Badge>
+                    </div>
+                    <div className="flex items-center gap-2 mb-4 text-xs text-muted-foreground">
+                      <Clock className="h-3 w-3" />
+                      <span>90 Minutes</span>
+                      <Target className="h-3 w-3 ml-2" />
+                      <span>Full Syllabus</span>
+                    </div>
+                    <Button
+                      className="w-full gap-2"
+                      onClick={() => onStartTest("full", test.id)}
+                    >
+                      <Play className="h-4 w-4" />
+                      Start Test
+                    </Button>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
         </div>
       ) : (
         <div className="max-w-4xl mx-auto mb-10 p-6 bg-secondary/50 rounded-lg text-center">
@@ -189,42 +177,8 @@ export function MockTestSelector({ onStartTest, isPaidUser }: MockTestSelectorPr
         </div>
       )}
 
-      {/* Manual Mock Tests */}
-      {isPaidUser && manualTests.length > 0 && (
-        <div className="max-w-4xl mx-auto mb-10">
-          <h2 className="text-xl font-bold text-foreground mb-4">
-            Custom Mock Tests
-            <Badge variant="secondary" className="ml-2">{manualTests.length}</Badge>
-          </h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {manualTests.map((test) => (
-              <Card key={test.id} className="border-border hover:border-primary/50 transition-colors">
-                <CardContent className="pt-6">
-                  <div className="mb-3">
-                    <p className="font-medium text-foreground">{test.name}</p>
-                    <p className="text-xs text-muted-foreground mt-1">{test.description}</p>
-                  </div>
-                  <div className="flex items-center gap-2 mb-4 flex-wrap">
-                    <Badge variant="outline" className="text-xs">{test.questions.length} Qs</Badge>
-                    <Badge variant="secondary" className="text-xs">11th: {test.class11Count}</Badge>
-                    <Badge variant="secondary" className="text-xs">12th: {test.class12Count}</Badge>
-                  </div>
-                  <Button
-                    className="w-full gap-2"
-                    onClick={() => onStartTest("full", test.id)}
-                  >
-                    <Play className="h-4 w-4" />
-                    Start Test
-                  </Button>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </div>
-      )}
-
       {/* Test Instructions */}
-      <Card className="max-w-4xl mx-auto border-border">
+      <Card className="max-w-4xl mx-auto border-border mb-8">
         <CardHeader>
           <CardTitle className="text-lg">Test Instructions</CardTitle>
         </CardHeader>
@@ -254,14 +208,10 @@ export function MockTestSelector({ onStartTest, isPaidUser }: MockTestSelectorPr
         </CardContent>
       </Card>
 
-      {/* Leaderboard — only for premium users */}
+      {/* Leaderboard */}
       {isPaidUser && (
-        <div className="max-w-4xl mx-auto mt-8">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-bold text-foreground flex items-center gap-2">
-              🏆 Leaderboard
-            </h2>
-          </div>
+        <div className="max-w-4xl mx-auto">
+          <h2 className="text-xl font-bold text-foreground mb-4">🏆 Leaderboard</h2>
           <Card className="border-border">
             <CardContent className="pt-6">
               <LeaderboardTable />

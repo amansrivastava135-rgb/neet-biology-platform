@@ -1,50 +1,34 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
+  Dialog, DialogContent, DialogDescription,
+  DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
-import { Plus, Trash2, Eye, Upload, Download, FileText } from "lucide-react";
-import { sampleQuestions, class11Chapters, class12Chapters, type Question } from "@/lib/data";
+import { Plus, Trash2, Eye, Upload, Download, FileText, Loader2, Edit, X } from "lucide-react";
+import { class11Chapters, class12Chapters } from "@/lib/data";
+import { createClient } from "@supabase/supabase-js";
 
-const STORAGE_KEY = "neet_manual_mock_tests";
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
 
-type ManualMockTest = {
+const SET_SIZE = 90;
+
+type MockTest = {
   id: string;
   name: string;
-  description: string;
-  questions: Question[];
-  createdAt: string;
-  class11Count: number;
-  class12Count: number;
+  question_ids: number[];
+  class11_count: number;
+  class12_count: number;
+  created_at: string;
 };
-
-function loadMockTests(): ManualMockTest[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const stored = window.localStorage.getItem(STORAGE_KEY);
-    return stored ? JSON.parse(stored) : [];
-  } catch {
-    return [];
-  }
-}
-
-function saveMockTests(tests: ManualMockTest[]) {
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(tests));
-  } catch {}
-}
 
 function shuffleArray<T>(array: T[]): T[] {
   const shuffled = [...array];
@@ -55,101 +39,119 @@ function shuffleArray<T>(array: T[]): T[] {
   return shuffled;
 }
 
-function generateBalancedMockTest(): Question[] {
-  let adminQuestions: Question[] = [];
-  try {
-    const stored = window.localStorage.getItem("neet_admin_questions");
-    if (stored) adminQuestions = JSON.parse(stored);
-  } catch {}
-
-  const allQuestions = [...adminQuestions, ...sampleQuestions];
-  const class11Ids = class11Chapters.map((c) => c.id);
-  const class12Ids = class12Chapters.map((c) => c.id);
-
-  const class11Questions = allQuestions.filter((q) => class11Ids.includes(q.chapterId));
-  const class12Questions = allQuestions.filter((q) => class12Ids.includes(q.chapterId));
-
-  // 45 from Class 11
-  const selected11: Question[] = [];
-  const perChapter11 = Math.ceil(45 / class11Ids.length);
-  class11Ids.forEach((id) => {
-    const qs = shuffleArray(class11Questions.filter((q) => q.chapterId === id));
-    selected11.push(...qs.slice(0, perChapter11));
-  });
-
-  // 45 from Class 12
-  const selected12: Question[] = [];
-  const perChapter12 = Math.ceil(45 / class12Ids.length);
-  class12Ids.forEach((id) => {
-    const qs = shuffleArray(class12Questions.filter((q) => q.chapterId === id));
-    selected12.push(...qs.slice(0, perChapter12));
-  });
-
-  const final11 = shuffleArray(selected11).slice(0, 45);
-  const final12 = shuffleArray(selected12).slice(0, 45);
-
-  return shuffleArray([...final11, ...final12]);
-}
-
 export function MockTestManager() {
-  const [mockTests, setMockTests] = useState<ManualMockTest[]>([]);
+  const [mockTests, setMockTests] = useState<MockTest[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
-  const [selectedTest, setSelectedTest] = useState<ManualMockTest | null>(null);
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [selectedTest, setSelectedTest] = useState<MockTest | null>(null);
+  const [previewQuestions, setPreviewQuestions] = useState<any[]>([]);
   const [newTestName, setNewTestName] = useState("");
-  const [newTestDesc, setNewTestDesc] = useState("");
   const [csvStatus, setCsvStatus] = useState<string | null>(null);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [editName, setEditName] = useState("");
+  const csvInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    setMockTests(loadMockTests());
+    fetchMockTests();
   }, []);
 
-  const handleCreateAutoTest = () => {
+  async function fetchMockTests() {
+    setIsLoading(true);
+    const { data, error } = await supabase
+      .from("mock_tests")
+      .select("*")
+      .order("created_at", { ascending: false });
+
+    if (!error && data) setMockTests(data);
+    setIsLoading(false);
+  }
+
+  // Auto generate — Supabase se 50% Class 11 + 50% Class 12
+  const handleCreateAutoTest = async () => {
     if (!newTestName.trim()) {
-      alert("Please enter a test name!");
+      alert("Test name daalo!");
       return;
     }
+    setIsGenerating(true);
 
-    const questions = generateBalancedMockTest();
     const class11Ids = class11Chapters.map((c) => c.id);
-    const class11Count = questions.filter((q) => class11Ids.includes(q.chapterId)).length;
-    const class12Count = questions.length - class11Count;
+    const class12Ids = class12Chapters.map((c) => c.id);
 
-    const newTest: ManualMockTest = {
+    // Class 11 questions
+    const { data: class11Data } = await supabase
+      .from("questions")
+      .select("id, chapter_id")
+      .in("chapter_id", class11Ids);
+
+    // Class 12 questions
+    const { data: class12Data } = await supabase
+      .from("questions")
+      .select("id, chapter_id")
+      .in("chapter_id", class12Ids);
+
+    const class11Questions = class11Data || [];
+    const class12Questions = class12Data || [];
+
+    // 45 from Class 11 — balanced
+    const selected11: any[] = [];
+    const perChapter11 = Math.ceil(45 / class11Ids.length);
+    class11Ids.forEach((id) => {
+      const qs = shuffleArray(class11Questions.filter((q) => q.chapter_id === id));
+      selected11.push(...qs.slice(0, perChapter11));
+    });
+
+    // 45 from Class 12 — balanced
+    const selected12: any[] = [];
+    const perChapter12 = Math.ceil(45 / class12Ids.length);
+    class12Ids.forEach((id) => {
+      const qs = shuffleArray(class12Questions.filter((q) => q.chapter_id === id));
+      selected12.push(...qs.slice(0, perChapter12));
+    });
+
+    const final11 = shuffleArray(selected11).slice(0, 45);
+    const final12 = shuffleArray(selected12).slice(0, 45);
+    const finalQuestions = shuffleArray([...final11, ...final12]);
+
+    const questionIds = finalQuestions.map((q) => q.id);
+
+    const { error } = await supabase.from("mock_tests").insert({
       id: Date.now().toString(),
       name: newTestName,
-      description: newTestDesc || `Auto-generated mock test with ${questions.length} questions`,
-      questions,
-      createdAt: new Date().toISOString(),
-      class11Count,
-      class12Count,
-    };
+      question_ids: questionIds,
+      class11_count: final11.length,
+      class12_count: final12.length,
+    });
 
-    const updated = [newTest, ...mockTests];
-    setMockTests(updated);
-    saveMockTests(updated);
-    setIsCreateDialogOpen(false);
-    setNewTestName("");
-    setNewTestDesc("");
+    if (!error) {
+      await fetchMockTests();
+      setIsCreateDialogOpen(false);
+      setNewTestName("");
+    } else {
+      alert("Error: " + error.message);
+    }
+    setIsGenerating(false);
   };
 
+  // CSV Upload — questions Supabase mein + mock test bhi
   const handleCSVUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    setCsvStatus("Uploading...");
+    setCsvStatus("⏳ Uploading...");
     const reader = new FileReader();
-    reader.onloadend = () => {
+    reader.onloadend = async () => {
       try {
         const text = reader.result as string;
         const lines = text.trim().split("\n");
         if (lines.length < 2) {
-          setCsvStatus("❌ No questions found in CSV!");
+          setCsvStatus("❌ No questions found!");
           return;
         }
 
         const allChapters = [...class11Chapters, ...class12Chapters];
-        const questions: Question[] = [];
+        const parsedQuestions: any[] = [];
 
         for (let i = 1; i < lines.length; i++) {
           const line = lines[i].trim();
@@ -161,78 +163,158 @@ export function MockTestManager() {
           for (let j = 0; j < line.length; j++) {
             if (line[j] === '"') inQuotes = !inQuotes;
             else if (line[j] === "," && !inQuotes) {
-              fields.push(current.trim());
-              current = "";
-            } else {
-              current += line[j];
-            }
+              fields.push(current.trim()); current = "";
+            } else { current += line[j]; }
           }
           fields.push(current.trim());
-
           if (fields.length < 8) continue;
 
-          const [question, optionA, optionB, optionC, optionD, correctAnswer, explanation, chapterId, source] = fields;
+          const [question, optionA, optionB, optionC, optionD, correctAnswer, explanation, chapterId, source, year] = fields;
           const chapId = parseInt(chapterId) || 1;
           const chapter = allChapters.find((c) => c.id === chapId);
 
-          questions.push({
-            id: Date.now() + i,
+          parsedQuestions.push({
             question,
-            options: { A: optionA, B: optionB, C: optionC, D: optionD },
-            correctAnswer: (correctAnswer?.toUpperCase() as "A" | "B" | "C" | "D") || "A",
+            option_a: optionA,
+            option_b: optionB,
+            option_c: optionC,
+            option_d: optionD,
+            correct_answer: correctAnswer?.toUpperCase() || "A",
             explanation: explanation || "",
-            chapterId: chapId,
-            chapterName: chapter?.name || "",
-            source: (source?.toUpperCase() === "PYQ" ? "PYQ" : "NCERT") as "PYQ" | "NCERT",
+            chapter_id: chapId,
+            chapter_name: chapter?.name || "",
+            source: source?.toUpperCase() === "PYQ" ? "PYQ" : "NCERT",
+            year: year && !isNaN(parseInt(year)) ? parseInt(year) : null,
           });
         }
 
-        if (questions.length === 0) {
-          setCsvStatus("❌ No valid questions found!");
+        if (parsedQuestions.length === 0) {
+          setCsvStatus("❌ No valid questions!");
           return;
         }
 
-        const class11Ids = class11Chapters.map((c) => c.id);
-        const class11Count = questions.filter((q) => class11Ids.includes(q.chapterId)).length;
-        const class12Count = questions.length - class11Count;
+        // Supabase mein questions add karo
+        let inserted = 0;
+        let skipped = 0;
+        const insertedIds: number[] = [];
 
+        const byChapter: Record<number, any[]> = {};
+        for (const q of parsedQuestions) {
+          if (!byChapter[q.chapter_id]) byChapter[q.chapter_id] = [];
+          byChapter[q.chapter_id].push(q);
+        }
+
+        for (const [chapId, qs] of Object.entries(byChapter)) {
+          const { count } = await supabase
+            .from("questions")
+            .select("*", { count: "exact", head: true })
+            .eq("chapter_id", parseInt(chapId));
+
+          let currentCount = count || 0;
+
+          for (const q of qs) {
+            const { data: existing } = await supabase
+              .from("questions")
+              .select("id")
+              .eq("chapter_id", q.chapter_id)
+              .eq("question", q.question)
+              .single();
+
+            if (existing) { skipped++; continue; }
+
+            const setNumber = Math.floor(currentCount / SET_SIZE) + 1;
+            const { data: inserted_q, error } = await supabase
+              .from("questions")
+              .insert({ ...q, set_number: setNumber })
+              .select("id")
+              .single();
+
+            if (!error && inserted_q) {
+              insertedIds.push(inserted_q.id);
+              inserted++;
+              currentCount++;
+            }
+          }
+        }
+
+        // Mock test bhi Supabase mein save karo
         const testName = file.name.replace(".csv", "");
-        const newTest: ManualMockTest = {
-          id: Date.now().toString(),
-          name: testName,
-          description: `Uploaded from CSV with ${questions.length} questions`,
-          questions: questions.slice(0, 90),
-          createdAt: new Date().toISOString(),
-          class11Count,
-          class12Count,
-        };
+        const class11Ids = class11Chapters.map((c) => c.id);
 
-        const updated = [newTest, ...mockTests];
-        setMockTests(updated);
-        saveMockTests(updated);
-        setCsvStatus(`✅ Mock test "${testName}" created with ${Math.min(questions.length, 90)} questions!`);
-        setTimeout(() => setCsvStatus(null), 5000);
-      } catch {
-        setCsvStatus("❌ Error parsing CSV!");
+        // Jo questions insert hue + existing questions for this mock test
+        const allQIds = insertedIds;
+        const class11Count = parsedQuestions
+          .filter((q) => class11Ids.includes(q.chapter_id))
+          .length;
+        const class12Count = parsedQuestions.length - class11Count;
+
+        if (allQIds.length > 0) {
+          await supabase.from("mock_tests").insert({
+            id: Date.now().toString(),
+            name: testName,
+            question_ids: allQIds.slice(0, 90),
+            class11_count: class11Count,
+            class12_count: class12Count,
+          });
+        }
+
+        await fetchMockTests();
+        setCsvStatus(
+          `✅ ${inserted} questions added to Supabase, ${skipped} skipped. Mock test "${testName}" created!`
+        );
+        setTimeout(() => setCsvStatus(null), 7000);
+      } catch (err) {
+        console.error(err);
+        setCsvStatus("❌ Error processing CSV!");
       }
-      e.target.value = "";
+      if (csvInputRef.current) csvInputRef.current.value = "";
     };
     reader.readAsText(file);
   };
 
-  const handleDelete = (id: string) => {
-    const updated = mockTests.filter((t) => t.id !== id);
-    setMockTests(updated);
-    saveMockTests(updated);
+  // Preview — questions fetch karo
+  const handlePreview = async (test: MockTest) => {
+    setSelectedTest(test);
+    const { data } = await supabase
+      .from("questions")
+      .select("*")
+      .in("id", test.question_ids.slice(0, 10));
+    setPreviewQuestions(data || []);
+    setIsPreviewOpen(true);
   };
 
+  // Edit — name update karo
+  const handleEdit = (test: MockTest) => {
+    setSelectedTest(test);
+    setEditName(test.name);
+    setIsEditOpen(true);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!selectedTest || !editName.trim()) return;
+    const { error } = await supabase
+      .from("mock_tests")
+      .update({ name: editName })
+      .eq("id", selectedTest.id);
+
+    if (!error) {
+      await fetchMockTests();
+      setIsEditOpen(false);
+    }
+  };
+
+  // Delete
+  const handleDelete = async (id: string) => {
+    const { error } = await supabase.from("mock_tests").delete().eq("id", id);
+    if (!error) setMockTests((prev) => prev.filter((t) => t.id !== id));
+  };
+
+  // Sample CSV download
   const handleDownloadSample = () => {
-    const headers = "question,optionA,optionB,optionC,optionD,correctAnswer,explanation,chapterId,source";
-    const rows = [
-      `"Which is the basic unit of life?","Cell","Tissue","Organ","Organism","A","Cell is the basic unit of life.",8,"NCERT"`,
-      `"Binomial nomenclature was introduced by?","Aristotle","Linnaeus","Theophrastus","Darwin","B","Linnaeus introduced binomial nomenclature.",1,"PYQ"`,
-    ];
-    const blob = new Blob([[headers, ...rows].join("\n")], { type: "text/csv" });
+    const headers = "question,optionA,optionB,optionC,optionD,correctAnswer,explanation,chapterId,source,year";
+    const r1 = `"Which is the basic unit of life?","Cell","Tissue","Organ","Organism","A","Cell is the basic unit.",8,"NCERT",""`;
+    const r2 = `"Binomial nomenclature was introduced by?","Aristotle","Linnaeus","Theophrastus","Darwin","B","Linnaeus introduced it.",1,"PYQ","2020"`;
+    const blob = new Blob([`${headers}\n${r1}\n${r2}`], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
@@ -247,26 +329,18 @@ export function MockTestManager() {
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-xl font-semibold text-foreground">Mock Test Manager</h2>
-          <p className="text-sm text-muted-foreground">
-            Create and manage custom mock tests for students
-          </p>
+          <p className="text-sm text-muted-foreground">Create and manage mock tests — stored in Supabase</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           <Button variant="outline" className="gap-2" onClick={handleDownloadSample}>
             <Download className="h-4 w-4" />
             Sample CSV
           </Button>
-          <Button variant="outline" className="gap-2" onClick={() => document.getElementById("csv-upload")?.click()}>
+          <Button variant="outline" className="gap-2" onClick={() => csvInputRef.current?.click()}>
             <Upload className="h-4 w-4" />
             Upload CSV
           </Button>
-          <input
-            id="csv-upload"
-            type="file"
-            accept=".csv"
-            className="hidden"
-            onChange={handleCSVUpload}
-          />
+          <input ref={csvInputRef} type="file" accept=".csv" className="hidden" onChange={handleCSVUpload} />
           <Button className="gap-2" onClick={() => setIsCreateDialogOpen(true)}>
             <Plus className="h-4 w-4" />
             Auto Generate
@@ -285,16 +359,16 @@ export function MockTestManager() {
         </div>
       )}
 
-      {/* Info Card */}
+      {/* Info */}
       <Card className="border-border bg-muted/30">
         <CardContent className="pt-4 pb-4">
-          <p className="text-sm font-medium text-foreground mb-1">📋 Auto Generate:</p>
+          <p className="text-sm font-medium mb-1">📋 Auto Generate:</p>
           <p className="text-xs text-muted-foreground">
-            Automatically creates a balanced 90-question mock test — 45 from Class 11 + 45 from Class 12
+            45 questions Class 11 + 45 questions Class 12 — balanced across all chapters from Supabase
           </p>
-          <p className="text-sm font-medium text-foreground mt-3 mb-1">📤 Upload CSV:</p>
+          <p className="text-sm font-medium mt-3 mb-1">📤 Upload CSV:</p>
           <p className="text-xs text-muted-foreground">
-            Upload custom questions via CSV (max 90 questions). Same format as Question Manager.
+            Questions Supabase mein add honge (no duplicates) + mock test bhi save hoga
           </p>
         </CardContent>
       </Card>
@@ -303,17 +377,19 @@ export function MockTestManager() {
       <Card className="border-border">
         <CardHeader>
           <CardTitle className="text-lg">
-            Mock Tests ({mockTests.length})
+            Mock Tests ({isLoading ? "..." : mockTests.length})
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {mockTests.length === 0 ? (
+          {isLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="h-6 w-6 animate-spin text-primary" />
+              <span className="ml-2 text-muted-foreground">Loading...</span>
+            </div>
+          ) : mockTests.length === 0 ? (
             <div className="text-center py-12">
               <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-              <p className="text-muted-foreground">No mock tests created yet.</p>
-              <p className="text-sm text-muted-foreground mt-1">
-                Click "Auto Generate" or "Upload CSV" to create one!
-              </p>
+              <p className="text-muted-foreground">No mock tests yet.</p>
             </div>
           ) : (
             <div className="space-y-4">
@@ -321,33 +397,24 @@ export function MockTestManager() {
                 <div key={test.id} className="p-4 border border-border rounded-lg">
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex-1">
-                      <p className="font-medium text-foreground mb-1">{test.name}</p>
-                      <p className="text-sm text-muted-foreground mb-2">{test.description}</p>
+                      <p className="font-medium text-foreground mb-2">{test.name}</p>
                       <div className="flex items-center gap-2 flex-wrap">
-                        <Badge variant="default">{test.questions.length} Questions</Badge>
-                        <Badge variant="secondary">Class 11: {test.class11Count}</Badge>
-                        <Badge variant="secondary">Class 12: {test.class12Count}</Badge>
+                        <Badge variant="default">{test.question_ids.length} Questions</Badge>
+                        <Badge variant="secondary">Class 11: {test.class11_count}</Badge>
+                        <Badge variant="secondary">Class 12: {test.class12_count}</Badge>
                         <span className="text-xs text-muted-foreground">
-                          Created: {new Date(test.createdAt).toLocaleDateString()}
+                          {new Date(test.created_at).toLocaleDateString()}
                         </span>
                       </div>
                     </div>
-                    <div className="flex gap-2">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => {
-                          setSelectedTest(test);
-                          setIsPreviewOpen(true);
-                        }}
-                      >
+                    <div className="flex gap-1">
+                      <Button variant="ghost" size="icon" onClick={() => handlePreview(test)}>
                         <Eye className="h-4 w-4 text-primary" />
                       </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleDelete(test.id)}
-                      >
+                      <Button variant="ghost" size="icon" onClick={() => handleEdit(test)}>
+                        <Edit className="h-4 w-4 text-blue-500" />
+                      </Button>
+                      <Button variant="ghost" size="icon" onClick={() => handleDelete(test.id)}>
                         <Trash2 className="h-4 w-4 text-destructive" />
                       </Button>
                     </div>
@@ -359,36 +426,52 @@ export function MockTestManager() {
         </CardContent>
       </Card>
 
-      {/* Create Dialog */}
+      {/* Auto Generate Dialog */}
       <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Auto Generate Mock Test</DialogTitle>
             <DialogDescription>
-              Creates a balanced 90-question test — 45 from Class 11 + 45 from Class 12
+              45 Class 11 + 45 Class 12 questions from Supabase
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <Label>Test Name *</Label>
               <Input
-                placeholder="e.g. Mock Test 1, Full Syllabus Test..."
+                placeholder="e.g. Mock Test 4"
                 value={newTestName}
                 onChange={(e) => setNewTestName(e.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Description (Optional)</Label>
-              <Input
-                placeholder="e.g. Full syllabus practice test..."
-                value={newTestDesc}
-                onChange={(e) => setNewTestDesc(e.target.value)}
               />
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>Cancel</Button>
-            <Button onClick={handleCreateAutoTest}>Generate Test</Button>
+            <Button onClick={handleCreateAutoTest} disabled={isGenerating}>
+              {isGenerating ? <><Loader2 className="h-4 w-4 animate-spin mr-2" />Generating...</> : "Generate"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Dialog */}
+      <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Mock Test</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Test Name</Label>
+              <Input
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsEditOpen(false)}>Cancel</Button>
+            <Button onClick={handleSaveEdit}>Save</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -398,26 +481,21 @@ export function MockTestManager() {
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{selectedTest?.name}</DialogTitle>
-            <DialogDescription>{selectedTest?.description}</DialogDescription>
+            <DialogDescription>
+              {selectedTest?.question_ids.length} questions total — showing first 10
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-3 py-4">
-            {selectedTest?.questions.slice(0, 10).map((q, i) => (
+            {previewQuestions.map((q, i) => (
               <div key={q.id} className="p-3 border border-border rounded-lg">
-                <p className="text-sm font-medium text-foreground">
-                  Q{i + 1}. {q.question}
-                </p>
+                <p className="text-sm font-medium">Q{i + 1}. {q.question}</p>
                 <div className="flex gap-2 mt-1 flex-wrap">
-                  <Badge variant="secondary" className="text-xs">{q.chapterName}</Badge>
+                  <Badge variant="secondary" className="text-xs">{q.chapter_name}</Badge>
                   <Badge variant="outline" className="text-xs">{q.source}</Badge>
-                  <span className="text-xs text-muted-foreground">Ans: {q.correctAnswer}</span>
+                  <span className="text-xs text-muted-foreground">Ans: {q.correct_answer}</span>
                 </div>
               </div>
             ))}
-            {selectedTest && selectedTest.questions.length > 10 && (
-              <p className="text-sm text-muted-foreground text-center">
-                ... and {selectedTest.questions.length - 10} more questions
-              </p>
-            )}
           </div>
           <DialogFooter>
             <Button onClick={() => setIsPreviewOpen(false)}>Close</Button>

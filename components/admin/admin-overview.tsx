@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Users, FileQuestion, BookOpen, CreditCard, TrendingUp, IndianRupee } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
@@ -17,29 +17,57 @@ export function AdminOverview() {
   const [totalQuestions, setTotalQuestions] = useState(0);
   const [premiumCount, setPremiumCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+
+  const fetchData = useCallback(async () => {
+    const { data: usersData } = await supabase
+      .from("users")
+      .select("id, name, email, is_paid, subscription_end");
+
+    if (usersData) {
+      setStudents(usersData);
+      setPremiumCount(usersData.filter((u) => u.is_paid).length);
+    }
+
+    const { count } = await supabase
+      .from("questions")
+      .select("*", { count: "exact", head: true });
+
+    setTotalQuestions(count || 0);
+    setLastUpdated(new Date());
+    setIsLoading(false);
+  }, []);
 
   useEffect(() => {
-    async function fetchData() {
-      // Supabase se students fetch karo
-      const { data: usersData } = await supabase
-        .from("users")
-        .select("id, name, email, is_paid, subscription_end");
-
-      if (usersData) {
-        setStudents(usersData);
-        setPremiumCount(usersData.filter((u) => u.is_paid).length);
-      }
-
-      // Supabase se questions count fetch karo
-      const { count } = await supabase
-        .from("questions")
-        .select("*", { count: "exact", head: true });
-
-      setTotalQuestions(count || 0);
-      setIsLoading(false);
-    }
     fetchData();
-  }, []);
+  }, [fetchData]);
+
+  // Realtime — naya student aaye toh auto refresh
+  useEffect(() => {
+    const channel = supabase
+      .channel("admin_overview_realtime")
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "users" },
+        () => {
+          console.log("New user registered — refreshing admin overview");
+          fetchData();
+        }
+      )
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "users" },
+        () => {
+          console.log("User updated — refreshing admin overview");
+          fetchData();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [fetchData]);
 
   const totalChapters = class11Chapters.length + class12Chapters.length;
   const revenue = premiumCount * 499;
@@ -79,6 +107,20 @@ export function AdminOverview() {
 
   return (
     <div className="space-y-6">
+      {/* Live indicator */}
+      <div className="flex items-center justify-end gap-2">
+        <span className="flex h-2 w-2 relative">
+          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+          <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+        </span>
+        <span className="text-xs text-muted-foreground">Live</span>
+        {lastUpdated && (
+          <span className="text-xs text-muted-foreground">
+            · Updated {lastUpdated.toLocaleTimeString()}
+          </span>
+        )}
+      </div>
+
       {/* Stats Grid */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {stats.map((stat) => (
@@ -124,8 +166,12 @@ export function AdminOverview() {
                       if (active && payload && payload.length) {
                         return (
                           <div className="bg-card border border-border rounded-lg p-3 shadow-lg">
-                            <p className="font-medium text-foreground">{payload[0].payload.label}</p>
-                            <p className="text-sm text-muted-foreground">Students: {payload[0].value}</p>
+                            <p className="font-medium text-foreground">
+                              {payload[0].payload.label}
+                            </p>
+                            <p className="text-sm text-muted-foreground">
+                              Students: {payload[0].value}
+                            </p>
                           </div>
                         );
                       }

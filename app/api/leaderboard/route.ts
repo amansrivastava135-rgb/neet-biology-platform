@@ -1,10 +1,16 @@
-import { supabase } from "@/lib/supabase";
+import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
+
+// Service role — secure backend access
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
 
 // GET — leaderboard fetch karo
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
-  const type = searchParams.get("type") || "alltime"; // "weekly" | "alltime"
+  const type = searchParams.get("type") || "alltime";
   const testId = searchParams.get("testId") || "all";
 
   let query = supabase
@@ -15,14 +21,12 @@ export async function GET(req: Request) {
     .order("time_taken", { ascending: true })
     .limit(100);
 
-  // Weekly filter
   if (type === "weekly") {
     const weekAgo = new Date();
     weekAgo.setDate(weekAgo.getDate() - 7);
     query = query.gte("created_at", weekAgo.toISOString());
   }
 
-  // Test filter
   if (testId !== "all") {
     query = query.eq("test_id", testId);
   }
@@ -33,7 +37,6 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  // Best score per user only
   const bestScores = new Map();
   data?.forEach((row) => {
     const existing = bestScores.get(row.user_id);
@@ -72,13 +75,26 @@ export async function POST(req: Request) {
     unattempted,
   } = body;
 
-  // Badge check
+  // Basic validation
+  if (!userId || !userName || score === undefined) {
+    return NextResponse.json({ error: "Required fields missing" }, { status: 400 });
+  }
+
+  // Score validation — max 360 (90 questions x 4)
+  if (score > 360 || score < -90) {
+    return NextResponse.json({ error: "Invalid score" }, { status: 400 });
+  }
+
+  // Accuracy validation
+  if (accuracy < 0 || accuracy > 100) {
+    return NextResponse.json({ error: "Invalid accuracy" }, { status: 400 });
+  }
+
   const badges = [];
   if (accuracy >= 90) badges.push("accuracy_master");
   if (score >= 300) badges.push("high_scorer");
   if (score === 360) badges.push("perfect_score");
 
-  // Save result
   const { error } = await supabase.from("mock_test_results").insert({
     user_id: userId,
     user_name: userName,
@@ -95,7 +111,6 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  // Save badges
   if (badges.length > 0) {
     await supabase.from("user_badges").insert(
       badges.map((badge) => ({

@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { SignJWT } from "jose";
+import bcrypt from "bcryptjs";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
 export async function POST(req: Request) {
@@ -18,14 +19,36 @@ export async function POST(req: Request) {
     .from("users")
     .select("*")
     .eq("email", email)
-    .eq("password", password)
     .single();
 
   if (error || !user) {
     return NextResponse.json({ error: "Invalid email or password" }, { status: 401 });
   }
 
-  // JWT banao
+  // Bcrypt compare
+  let passwordMatch = false;
+
+  // Pehle check karo — hash hai ya plaintext
+  if (user.password.startsWith("$2")) {
+    // Bcrypt hash hai
+    passwordMatch = await bcrypt.compare(password, user.password);
+  } else {
+    // Purana plaintext password — compare karo aur migrate karo
+    passwordMatch = user.password === password;
+    if (passwordMatch) {
+      // Auto migrate to bcrypt
+      const hashed = await bcrypt.hash(password, 12);
+      await supabase
+        .from("users")
+        .update({ password: hashed })
+        .eq("email", email);
+    }
+  }
+
+  if (!passwordMatch) {
+    return NextResponse.json({ error: "Invalid email or password" }, { status: 401 });
+  }
+
   const secret = new TextEncoder().encode(process.env.JWT_SECRET);
   const token = await new SignJWT({
     id: user.id,
@@ -64,7 +87,6 @@ export async function POST(req: Request) {
   return response;
 }
 
-// OTP se login — password nahi chahiye
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const email = searchParams.get("email");

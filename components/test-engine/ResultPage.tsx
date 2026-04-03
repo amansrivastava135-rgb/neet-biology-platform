@@ -380,8 +380,8 @@ export function ResultPage({
           </CardContent>
         </Card>
 
-        {(testType === "full" || testType === "preview") && (
-          <Card className="border-border mb-8">
+        {testType === "full" && (
+  <Card className="border-border mb-8">
             <CardHeader>
               <CardTitle className="text-lg flex items-center gap-2">
                 <Trophy className="h-5 w-5 text-yellow-500" />

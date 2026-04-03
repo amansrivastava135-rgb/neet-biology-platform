@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -39,6 +39,7 @@ export function ResultPage({
 }: ResultPageProps) {
   const savedRef = useRef(false);
   const totalQuestions = questions.length;
+  const [visibleCount, setVisibleCount] = useState(5);
 
   let correctCount = 0;
   let incorrectCount = 0;
@@ -122,27 +123,27 @@ export function ResultPage({
       topicPerformance,
     };
     saveResult(result);
-     // Save result to Supabase (only for full mock tests)
+
     if (testType === "full") {
-     const storedUser = localStorage.getItem("neet_user");
-    if (storedUser) {
-     const userData = JSON.parse(storedUser);
-     supabase.from("mock_test_results").insert({
-      user_id: userData.id,
-      user_name: userData.name,
-      test_id: testLabel || testType,
-      score: score,
-      accuracy: accuracy,
-      time_taken: timeTaken,
-      correct_answers: correctCount,
-      wrong_answers: incorrectCount,
-      unattempted: unattemptedCount,
-      }).then(({ error }) => {
-      if (error) console.error("Leaderboard save error:", JSON.stringify(error), error.message, error.details, error.hint);
-      });
-     }
+      const storedUser = localStorage.getItem("neet_user");
+      if (storedUser) {
+        const userData = JSON.parse(storedUser);
+        supabase.from("mock_test_results").insert({
+          user_id: userData.id,
+          user_name: userData.name,
+          test_id: testLabel || testType,
+          score: score,
+          accuracy: accuracy,
+          time_taken: timeTaken,
+          correct_answers: correctCount,
+          wrong_answers: incorrectCount,
+          unattempted: unattemptedCount,
+        }).then(({ error }) => {
+          if (error) console.error("Leaderboard save error:", JSON.stringify(error));
+        });
+      }
     }
-    // Save progress per user
+
     try {
       const storedUser = localStorage.getItem("neet_user");
       if (storedUser) {
@@ -331,8 +332,8 @@ export function ResultPage({
             <CardTitle className="text-lg">Answer Review</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4 max-h-96 overflow-y-auto">
-              {questions.map((question, index) => {
+            <div className="space-y-4">
+              {questions.slice(0, visibleCount).map((question, index) => {
                 const userAnswer = answers[index];
                 const isCorrect = userAnswer === question.correctAnswer;
                 const wasAttempted = userAnswer !== null;
@@ -367,22 +368,31 @@ export function ResultPage({
                 );
               })}
             </div>
+            {visibleCount < questions.length && (
+              <Button
+                variant="outline"
+                className="w-full mt-4"
+                onClick={() => setVisibleCount((prev) => prev + 5)}
+              >
+                Show More ({questions.length - visibleCount} remaining)
+              </Button>
+            )}
           </CardContent>
         </Card>
 
         {(testType === "full" || testType === "preview") && (
-  <Card className="border-border mb-8">
-    <CardHeader>
-      <CardTitle className="text-lg flex items-center gap-2">
-        <Trophy className="h-5 w-5 text-yellow-500" />
-        Leaderboard
-      </CardTitle>
-    </CardHeader>
-    <CardContent>
-      <LeaderboardTable testId={testType} />
-    </CardContent>
-  </Card>
-)}
+          <Card className="border-border mb-8">
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Trophy className="h-5 w-5 text-yellow-500" />
+                Leaderboard
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <LeaderboardTable testId={testType} />
+            </CardContent>
+          </Card>
+        )}
 
         <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
           <Button variant="outline" asChild className="gap-2 w-full sm:w-auto">

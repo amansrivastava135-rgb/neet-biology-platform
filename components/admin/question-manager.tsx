@@ -100,7 +100,6 @@ export function QuestionManager() {
       }
       fields.push(current.trim());
 
-      // ← year optional hai — 9 columns minimum chahiye
       if (fields.length < 9) continue;
 
       const [question, optionA, optionB, optionC, optionD, correctAnswer, explanation, chapterId, source, year = ""] = fields;
@@ -158,14 +157,15 @@ export function QuestionManager() {
           let currentCount = count || 0;
 
           for (const q of qs) {
-            const { data: existing } = await supabase
+            // ← .single() hataya — .limit(1) use karo
+            const { data: existingList } = await supabase
               .from("questions")
               .select("id")
               .eq("chapter_id", q.chapter_id)
               .eq("question", q.question)
-              .single();
+              .limit(1);
 
-            if (existing) { skipped++; continue; }
+            if (existingList && existingList.length > 0) { skipped++; continue; }
 
             const setNumber = Math.floor(currentCount / SET_SIZE) + 1;
 
@@ -248,14 +248,15 @@ export function QuestionManager() {
 
       const setNumber = Math.floor((count || 0) / SET_SIZE) + 1;
 
-      const { data: existing } = await supabase
+      // ← .single() hataya — .limit(1) use karo
+      const { data: existingList } = await supabase
         .from("questions")
         .select("id")
         .eq("chapter_id", form.chapterId)
         .eq("question", form.question)
-        .single();
+        .limit(1);
 
-      if (existing) {
+      if (existingList && existingList.length > 0) {
         alert("Ye question already exist karta hai is chapter mein!");
         setIsSaving(false);
         return;

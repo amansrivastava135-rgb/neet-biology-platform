@@ -2,10 +2,11 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Users, FileQuestion, BookOpen, CreditCard, TrendingUp, IndianRupee } from "lucide-react";
+import { Users, FileQuestion, BookOpen, CreditCard, TrendingUp, IndianRupee, RefreshCw } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import { class11Chapters, class12Chapters } from "@/lib/data";
 import { createClient } from "@supabase/supabase-js";
+import { Button } from "@/components/ui/button";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -20,6 +21,7 @@ export function AdminOverview() {
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
   const fetchData = useCallback(async () => {
+    setIsLoading(true);
     const { data: usersData } = await supabase
       .from("users")
       .select("id, name, email, is_paid, subscription_end");
@@ -42,32 +44,8 @@ export function AdminOverview() {
     fetchData();
   }, [fetchData]);
 
-  // Realtime — naya student aaye toh auto refresh
-  useEffect(() => {
-    const channel = supabase
-      .channel("admin_overview_realtime")
-      .on(
-        "postgres_changes",
-        { event: "INSERT", schema: "public", table: "users" },
-        () => {
-          console.log("New user registered — refreshing admin overview");
-          fetchData();
-        }
-      )
-      .on(
-        "postgres_changes",
-        { event: "UPDATE", schema: "public", table: "users" },
-        () => {
-          console.log("User updated — refreshing admin overview");
-          fetchData();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [fetchData]);
+  // Realtime HATAYA — CSP block kar rahi thi, phone crash ho raha tha
+  // Manual refresh button se kaam chalega
 
   const totalChapters = class11Chapters.length + class12Chapters.length;
   const revenue = premiumCount * 499;
@@ -107,16 +85,21 @@ export function AdminOverview() {
 
   return (
     <div className="space-y-6">
-      {/* Live indicator */}
+      {/* Refresh button */}
       <div className="flex items-center justify-end gap-2">
-        <span className="flex h-2 w-2 relative">
-          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-          <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
-        </span>
-        <span className="text-xs text-muted-foreground">Live</span>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={fetchData}
+          disabled={isLoading}
+          className="gap-2"
+        >
+          <RefreshCw className={`h-3 w-3 ${isLoading ? "animate-spin" : ""}`} />
+          Refresh
+        </Button>
         {lastUpdated && (
           <span className="text-xs text-muted-foreground">
-            · Updated {lastUpdated.toLocaleTimeString()}
+            Updated {lastUpdated.toLocaleTimeString()}
           </span>
         )}
       </div>

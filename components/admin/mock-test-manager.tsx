@@ -12,12 +12,7 @@ import {
 } from "@/components/ui/dialog";
 import { Plus, Trash2, Eye, Upload, Download, FileText, Loader2, Edit, X } from "lucide-react";
 import { class11Chapters, class12Chapters } from "@/lib/data";
-import { createClient } from "@supabase/supabase-js";
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+import { supabase } from "@/lib/supabase";
 
 const SET_SIZE = 90;
 

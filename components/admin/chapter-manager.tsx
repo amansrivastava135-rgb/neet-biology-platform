@@ -10,12 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { class11Chapters, class12Chapters } from "@/lib/data";
 import { BookOpen, FileQuestion, Edit, Plus, Loader2, Trash2, X, ChevronDown, ChevronUp } from "lucide-react";
-import { createClient } from "@supabase/supabase-js";
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+import { supabase } from "@/lib/supabase";
 
 type ChapterStats = {
   chapterId: number;

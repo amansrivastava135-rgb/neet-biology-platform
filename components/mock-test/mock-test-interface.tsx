@@ -3,12 +3,7 @@
 import { useEffect, useState } from "react";
 import { TestEngine, TestSubmitPayload } from "@/components/test-engine/TestEngine";
 import { class11Chapters, class12Chapters, type Question } from "@/lib/data";
-import { createClient } from "@supabase/supabase-js";
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+import { supabase } from "@/lib/supabase";
 
 type MockTestInterfaceProps = {
   testType: "full" | "preview";

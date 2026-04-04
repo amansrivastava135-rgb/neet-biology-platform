@@ -9,12 +9,7 @@ import Link from "next/link";
 import { getRemainingDays } from "@/lib/subscription-utils";
 import { useAuth } from "@/lib/auth-context";
 import { LeaderboardTable } from "@/components/leaderboard/LeaderboardTable";
-import { createClient } from "@supabase/supabase-js";
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+import { supabase } from "@/lib/supabase";
 
 type MockTest = {
   id: string;

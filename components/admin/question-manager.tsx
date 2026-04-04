@@ -61,7 +61,6 @@ export function QuestionManager() {
     const { data, error } = await query.limit(50);
     if (!error && data) setQuestions(data);
 
-    // Total count
     const { count } = await supabase
       .from("questions")
       .select("*", { count: "exact", head: true });
@@ -69,7 +68,6 @@ export function QuestionManager() {
     setIsLoading(false);
   }
 
-  // Download sample CSV
   const handleDownloadSample = () => {
     const headers = "question,optionA,optionB,optionC,optionD,correctAnswer,explanation,chapterId,source,year";
     const r1 = `"Which is the basic unit of life?","Cell","Tissue","Organ","Organism","A","Cell is the basic structural unit.",8,"NCERT",""`;
@@ -83,7 +81,6 @@ export function QuestionManager() {
     URL.revokeObjectURL(url);
   };
 
-  // Parse CSV
   const parseCSV = (text: string): any[] => {
     const lines = text.trim().split("\n");
     if (lines.length < 2) return [];
@@ -102,9 +99,11 @@ export function QuestionManager() {
         else { current += line[j]; }
       }
       fields.push(current.trim());
-      if (fields.length < 8) continue;
 
-      const [question, optionA, optionB, optionC, optionD, correctAnswer, explanation, chapterId, source, year] = fields;
+      // ← year optional hai — 9 columns minimum chahiye
+      if (fields.length < 9) continue;
+
+      const [question, optionA, optionB, optionC, optionD, correctAnswer, explanation, chapterId, source, year = ""] = fields;
       const chapId = parseInt(chapterId) || 1;
       const chapter = allChapters.find((c) => c.id === chapId);
 
@@ -125,7 +124,6 @@ export function QuestionManager() {
     return results;
   };
 
-  // Bulk Upload — Supabase mein
   const handleBulkUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -145,7 +143,6 @@ export function QuestionManager() {
         let inserted = 0;
         let skipped = 0;
 
-        // Chapter wise group karo for set numbering
         const byChapter: Record<number, any[]> = {};
         for (const q of parsed) {
           if (!byChapter[q.chapter_id]) byChapter[q.chapter_id] = [];
@@ -153,7 +150,6 @@ export function QuestionManager() {
         }
 
         for (const [chapId, qs] of Object.entries(byChapter)) {
-          // Current count fetch karo
           const { count } = await supabase
             .from("questions")
             .select("*", { count: "exact", head: true })
@@ -162,7 +158,6 @@ export function QuestionManager() {
           let currentCount = count || 0;
 
           for (const q of qs) {
-            // Duplicate check
             const { data: existing } = await supabase
               .from("questions")
               .select("id")
@@ -227,7 +222,6 @@ export function QuestionManager() {
     const chapter = allChapters.find((c) => c.id === form.chapterId);
 
     if (editingQuestion) {
-      // Update
       const { error } = await supabase
         .from("questions")
         .update({
@@ -247,7 +241,6 @@ export function QuestionManager() {
 
       if (error) { alert("Error: " + error.message); }
     } else {
-      // Insert new
       const { count } = await supabase
         .from("questions")
         .select("*", { count: "exact", head: true })
@@ -255,7 +248,6 @@ export function QuestionManager() {
 
       const setNumber = Math.floor((count || 0) / SET_SIZE) + 1;
 
-      // Duplicate check
       const { data: existing } = await supabase
         .from("questions")
         .select("id")
@@ -309,7 +301,6 @@ export function QuestionManager() {
 
   return (
     <div className="space-y-6">
-      {/* Action Bar */}
       <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
         <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
           <div className="relative">
@@ -361,7 +352,6 @@ export function QuestionManager() {
         </div>
       </div>
 
-      {/* Status */}
       {bulkUploadStatus && (
         <div className={`p-3 rounded-lg text-sm font-medium ${
           bulkUploadStatus.startsWith("✅") ? "bg-green-100 text-green-800" :
@@ -372,20 +362,18 @@ export function QuestionManager() {
         </div>
       )}
 
-      {/* CSV Format */}
       <Card className="border-border bg-muted/30">
         <CardContent className="pt-4 pb-4">
           <p className="text-sm font-medium mb-1">📋 CSV Format:</p>
           <p className="text-xs text-muted-foreground font-mono">
-            question, optionA, optionB, optionC, optionD, correctAnswer, explanation, chapterId, source, year
+            question, optionA, optionB, optionC, optionD, correctAnswer, explanation, chapterId, source, year(optional)
           </p>
           <p className="text-xs text-muted-foreground mt-1">
-            correctAnswer: A/B/C/D | source: NCERT/PYQ | chapterId: 1-38 | year: 2020 (only for PYQ)
+            correctAnswer: A/B/C/D | source: NCERT/PYQ | chapterId: 1-38 | year: 2020 (only for PYQ, optional)
           </p>
         </CardContent>
       </Card>
 
-      {/* Add/Edit Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
@@ -480,7 +468,6 @@ export function QuestionManager() {
         </DialogContent>
       </Dialog>
 
-      {/* Questions List */}
       <Card className="border-border">
         <CardHeader>
           <CardTitle className="text-lg">

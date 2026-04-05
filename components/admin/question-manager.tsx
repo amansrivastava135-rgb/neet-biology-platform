@@ -69,9 +69,9 @@ export function QuestionManager() {
   }
 
   const handleDownloadSample = () => {
-    const headers = "question,optionA,optionB,optionC,optionD,correctAnswer,explanation,chapterId,source,year";
-    const r1 = `"Which is the basic unit of life?","Cell","Tissue","Organ","Organism","A","Cell is the basic structural unit.",8,"NCERT",""`;
-    const r2 = `"Binomial nomenclature was introduced by?","Aristotle","Linnaeus","Theophrastus","Darwin","B","Carolus Linnaeus introduced it.",1,"PYQ","2020"`;
+    const headers = "question,optionA,optionB,optionC,optionD,correctAnswer,explanation,chapterName,source,year";
+    const r1 = `"Which is the basic unit of life?","Cell","Tissue","Organ","Organism","A","Cell is the basic structural unit.","Cell – The Unit of Life","NCERT",""`;
+    const r2 = `"Binomial nomenclature was introduced by?","Aristotle","Linnaeus","Theophrastus","Darwin","B","Carolus Linnaeus introduced it.","The Living World","PYQ","2020"`;
     const blob = new Blob([`${headers}\n${r1}\n${r2}`], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -102,15 +102,16 @@ export function QuestionManager() {
 
       if (fields.length < 9) continue;
 
-    const [question, optionA, optionB, optionC, optionD, correctAnswer, explanation, chapterIdOrName, source, year = ""] = fields;
+      const [question, optionA, optionB, optionC, optionD, correctAnswer, explanation, chapterIdOrName, source, year = ""] = fields;
 
-// Pehle name se dhundo, nahi mila toh ID se
-const chapByName = allChapters.find((c) =>
-  c.name.toLowerCase().trim() === chapterIdOrName.toLowerCase().trim()
-);
-const chapById = allChapters.find((c) => c.id === parseInt(chapterIdOrName));
-const chapter = chapByName || chapById;
-const chapId = chapter?.id || 1;
+      // Pehle exact name se dhundo (case insensitive)
+      const chapByName = allChapters.find((c) =>
+        c.name.toLowerCase().trim() === chapterIdOrName.toLowerCase().trim()
+      );
+      // Nahi mila toh ID se dhundo
+      const chapById = allChapters.find((c) => c.id === parseInt(chapterIdOrName));
+      const chapter = chapByName || chapById;
+      const chapId = chapter?.id || 1;
 
       results.push({
         question,
@@ -121,7 +122,7 @@ const chapId = chapter?.id || 1;
         correct_answer: (correctAnswer?.toUpperCase() as string) || "A",
         explanation: explanation || "",
         chapter_id: chapId,
-        chapter_name: chapter?.name || "",
+        chapter_name: chapter?.name || chapterIdOrName,
         source: source?.toUpperCase() === "PYQ" ? "PYQ" : "NCERT",
         year: year && !isNaN(parseInt(year)) ? parseInt(year) : null,
       });
@@ -163,7 +164,6 @@ const chapId = chapter?.id || 1;
           let currentCount = count || 0;
 
           for (const q of qs) {
-            // ← .single() hataya — .limit(1) use karo
             const { data: existingList } = await supabase
               .from("questions")
               .select("id")
@@ -254,7 +254,6 @@ const chapId = chapter?.id || 1;
 
       const setNumber = Math.floor((count || 0) / SET_SIZE) + 1;
 
-      // ← .single() hataya — .limit(1) use karo
       const { data: existingList } = await supabase
         .from("questions")
         .select("id")
@@ -373,10 +372,10 @@ const chapId = chapter?.id || 1;
         <CardContent className="pt-4 pb-4">
           <p className="text-sm font-medium mb-1">📋 CSV Format:</p>
           <p className="text-xs text-muted-foreground font-mono">
-            question, optionA, optionB, optionC, optionD, correctAnswer, explanation, chapterId, source, year(optional)
+            question, optionA, optionB, optionC, optionD, correctAnswer, explanation, chapterName, source, year(optional)
           </p>
           <p className="text-xs text-muted-foreground mt-1">
-            correctAnswer: A/B/C/D | source: NCERT/PYQ | chapterId: 1-38 | year: 2020 (only for PYQ, optional)
+            correctAnswer: A/B/C/D | source: NCERT/PYQ | chapterName: "Organisms and Populations" | year: 2020 (only for PYQ)
           </p>
         </CardContent>
       </Card>

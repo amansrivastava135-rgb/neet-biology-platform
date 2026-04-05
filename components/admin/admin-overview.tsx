@@ -5,13 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Users, FileQuestion, BookOpen, CreditCard, TrendingUp, IndianRupee, RefreshCw } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import { class11Chapters, class12Chapters } from "@/lib/data";
-import { createClient } from "@supabase/supabase-js";
 import { Button } from "@/components/ui/button";
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+import { supabase } from "@/lib/supabase";
 
 export function AdminOverview() {
   const [students, setStudents] = useState<any[]>([]);

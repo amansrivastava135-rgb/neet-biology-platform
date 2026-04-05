@@ -102,9 +102,15 @@ export function QuestionManager() {
 
       if (fields.length < 9) continue;
 
-      const [question, optionA, optionB, optionC, optionD, correctAnswer, explanation, chapterId, source, year = ""] = fields;
-      const chapId = parseInt(chapterId) || 1;
-      const chapter = allChapters.find((c) => c.id === chapId);
+    const [question, optionA, optionB, optionC, optionD, correctAnswer, explanation, chapterIdOrName, source, year = ""] = fields;
+
+// Pehle name se dhundo, nahi mila toh ID se
+const chapByName = allChapters.find((c) =>
+  c.name.toLowerCase().trim() === chapterIdOrName.toLowerCase().trim()
+);
+const chapById = allChapters.find((c) => c.id === parseInt(chapterIdOrName));
+const chapter = chapByName || chapById;
+const chapId = chapter?.id || 1;
 
       results.push({
         question,

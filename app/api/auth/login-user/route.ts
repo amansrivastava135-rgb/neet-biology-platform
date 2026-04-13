@@ -25,18 +25,14 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Invalid email or password" }, { status: 401 });
   }
 
-  // Bcrypt compare
+  // Password match check
   let passwordMatch = false;
-
-  // Pehle check karo — hash hai ya plaintext
   if (user.password.startsWith("$2")) {
-    // Bcrypt hash hai
     passwordMatch = await bcrypt.compare(password, user.password);
   } else {
-    // Purana plaintext password — compare karo aur migrate karo
+    // Plaintext — compare aur auto migrate
     passwordMatch = user.password === password;
     if (passwordMatch) {
-      // Auto migrate to bcrypt
       const hashed = await bcrypt.hash(password, 12);
       await supabase
         .from("users")
@@ -49,11 +45,17 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Invalid email or password" }, { status: 401 });
   }
 
+  // Admin check — DB ka is_admin + env variable se double check
+  const adminEmail = process.env.ADMIN_EMAIL;
+  const isAdmin =
+    user.is_admin === true ||
+    (adminEmail ? user.email === adminEmail : false);
+
   const secret = new TextEncoder().encode(process.env.JWT_SECRET);
   const token = await new SignJWT({
     id: user.id,
     email: user.email,
-    isAdmin: user.is_admin,
+    isAdmin: isAdmin,
     isPaid: user.is_paid,
     isPremium: user.is_paid,
     subscriptionPlan: user.subscription_plan,
@@ -67,7 +69,7 @@ export async function POST(req: Request) {
     id: user.id,
     email: user.email,
     name: user.name,
-    isAdmin: user.is_admin,
+    isAdmin: isAdmin,
     isPaid: user.is_paid,
     subscriptionPlan: user.subscription_plan,
     subscriptionStart: user.subscription_start,
@@ -105,11 +107,16 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "User not found" }, { status: 404 });
   }
 
+  const adminEmail = process.env.ADMIN_EMAIL;
+  const isAdmin =
+    user.is_admin === true ||
+    (adminEmail ? user.email === adminEmail : false);
+
   const secret = new TextEncoder().encode(process.env.JWT_SECRET);
   const token = await new SignJWT({
     id: user.id,
     email: user.email,
-    isAdmin: user.is_admin,
+    isAdmin: isAdmin,
     isPaid: user.is_paid,
     isPremium: user.is_paid,
     subscriptionPlan: user.subscription_plan,
@@ -123,7 +130,7 @@ export async function GET(req: Request) {
     id: user.id,
     email: user.email,
     name: user.name,
-    isAdmin: user.is_admin,
+    isAdmin: isAdmin,
     isPaid: user.is_paid,
     subscriptionPlan: user.subscription_plan,
     subscriptionStart: user.subscription_start,

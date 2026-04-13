@@ -2,21 +2,24 @@ import { SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
 
 const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET!);
-const COOKIE_NAME = "neet_token";
+export const COOKIE_NAME = "neet_token";
 
 export interface JWTUser {
   id: string;
   email: string;
   name: string;
   isAdmin: boolean;
+  isPaid: boolean;
   isPremium: boolean;
+  subscriptionPlan?: string;
+  subscriptionEnd?: string;
 }
 
 export async function signToken(user: JWTUser): Promise<string> {
   return new SignJWT({ ...user })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
-    .setExpirationTime("7d")
+    .setExpirationTime("365d") // consistent everywhere
     .sign(JWT_SECRET);
 }
 
@@ -42,9 +45,7 @@ export function getTokenCookieOptions() {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax" as const,
-    maxAge: 60 * 60 * 24 * 7,
+    maxAge: 60 * 60 * 24 * 365, // 365 days
     path: "/",
   };
 }
-
-export { COOKIE_NAME };

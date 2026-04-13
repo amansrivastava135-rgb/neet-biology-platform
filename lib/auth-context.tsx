@@ -8,14 +8,21 @@ async function setJWTCookie(user: User) {
   });
 }
 
-import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  ReactNode,
+} from "react";
 
 export type User = {
   id: string;
   email: string;
   name: string;
   isPaid: boolean;
-  subscriptionPlan?: "free" | "premium" | "expired";
+  // naye plans add kiye
+  subscriptionPlan?: "free" | "crash" | "sixMonth" | "premium" | "expired";
   subscriptionStart?: string;
   subscriptionEnd?: string;
   subscription?: "free" | "active" | "expired";
@@ -24,6 +31,7 @@ export type User = {
   subscription_start?: string;
   subscription_end?: string;
   isAdmin: boolean;
+  devices?: string[];
 };
 
 export type UserProgress = {
@@ -56,53 +64,31 @@ function progressKey(userId: string) {
   return `neet_progress_${userId}`;
 }
 
-const DEMO_USERS: Record<string, { password: string; user: User }> = {
-  "demo@example.com": {
-    password: "demo123",
-    user: {
-      id: "1",
-      email: "demo@example.com",
-      name: "Demo User",
-      isPaid: false,
-      isAdmin: false,
-      subscription: "free",
-      subscriptionPlan: "free",
-    },
-  },
-  "paid@example.com": {
-    password: "paid123",
-    user: {
-      id: "2",
-      email: "paid@example.com",
-      name: "Paid User",
-      isPaid: true,
-      isAdmin: false,
-      subscriptionPlan: "premium",
-      subscription: "active",
-      subscriptionEnd: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
-    },
-  },
-  "admin@example.com": {
-    password: "admin123",
-    user: {
-      id: "3",
-      email: "admin@example.com",
-      name: "Admin",
-      isPaid: true,
-      isAdmin: true,
-      subscriptionPlan: "premium",
-      subscription: "active",
-      subscriptionEnd: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
-    },
-  },
-};
+// Demo users — sirf development mein kaam karenge
+const DEMO_USERS: Record<string, { password: string; user: User }> =
+  process.env.NODE_ENV === "development"
+    ? {
+        "demo@example.com": {
+          password: "demo123",
+          user: {
+            id: "demo_1",
+            email: "demo@example.com",
+            name: "Demo User",
+            isPaid: false,
+            isAdmin: false,
+            subscription: "free",
+            subscriptionPlan: "free",
+          },
+        },
+      }
+    : {};
 
 function applySubscription(u: User, plan: string, days: number): User {
   const now = new Date();
   const expiry = new Date(now.getTime() + days * 24 * 60 * 60 * 1000);
   return {
     ...u,
-    subscriptionPlan: "premium",
+    subscriptionPlan: plan as User["subscriptionPlan"],
     subscriptionStart: now.toISOString(),
     subscriptionEnd: expiry.toISOString(),
     subscription: "active",
@@ -116,6 +102,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [progress, setProgress] = useState<UserProgress>(EMPTY_PROGRESS);
   const [isLoading, setIsLoading] = useState(true);
 
+  // localStorage se user load karo
   useEffect(() => {
     const storedUser = localStorage.getItem("neet_user");
     if (storedUser) {
@@ -136,7 +123,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const login = async (email: string, password: string): Promise<boolean> => {
-    // Demo users check
+    // Demo users check — sirf dev mein
     const demoUser = DEMO_USERS[email];
     if (demoUser && demoUser.password === password) {
       setUser(demoUser.user);
@@ -162,17 +149,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const storedProgress = localStorage.getItem(progressKey(data.user.id));
       setProgress(storedProgress ? JSON.parse(storedProgress) : EMPTY_PROGRESS);
       localStorage.setItem("neet_user", JSON.stringify(data.user));
+      // JWT cookie login-user route ne already set kar di hai
       return true;
     }
 
     return false;
   };
 
-  const signup = async (email: string, password: string, name: string): Promise<boolean> => {
-    // Demo users check
+  const signup = async (
+    email: string,
+    password: string,
+    name: string
+  ): Promise<boolean> => {
+    // Demo users ke email se signup block karo
     if (DEMO_USERS[email]) return false;
 
-    // Supabase mein signup
     const res = await fetch("/api/auth/signup", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -233,7 +224,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           ...prev.chapterProgress,
           [chapterId]: {
             attempted: (prev.chapterProgress[chapterId]?.attempted || 0) + 1,
-            correct: (prev.chapterProgress[chapterId]?.correct || 0) + (isCorrect ? 1 : 0),
+            correct:
+              (prev.chapterProgress[chapterId]?.correct || 0) +
+              (isCorrect ? 1 : 0),
           },
         },
       };
@@ -244,7 +237,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ user, progress, isLoading, login, signup, logout, updateProgress, updateUser, activateSubscription }}
+      value={{
+        user,
+        progress,
+        isLoading,
+        login,
+        signup,
+        logout,
+        updateProgress,
+        updateUser,
+        activateSubscription,
+      }}
     >
       {children}
     </AuthContext.Provider>

@@ -1,50 +1,53 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifySignature } from "@/lib/payment/razorpay";
-import { PRICING, calculateSubscriptionEnd } from "@/lib/pricing-config";
+import { getPlanById, calculateSubscriptionEnd } from "@/lib/pricing-config";
 import { createClient } from "@supabase/supabase-js";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { razorpay_order_id, razorpay_payment_id, razorpay_signature, email } = body;
+    const {
+      razorpay_order_id,
+      razorpay_payment_id,
+      razorpay_signature,
+      email,
+      planId = "premium",
+    } = body;
 
-    // Signature verify karo
     const valid = verifySignature({ razorpay_order_id, razorpay_payment_id, razorpay_signature });
     if (!valid) {
       return NextResponse.json({ success: false, message: "Invalid signature" }, { status: 400 });
     }
 
+    const plan = getPlanById(planId);
     const now = new Date();
-    const subscriptionEnd = calculateSubscriptionEnd(now);
+    const subscriptionEnd = calculateSubscriptionEnd(now, plan.durationDays);
 
-    // Supabase update karo
     if (email) {
       const { error } = await supabase
         .from("users")
         .update({
           is_paid: true,
-          subscription_plan: PRICING.premium.id,
+          subscription_plan: plan.id,
           subscription_start: now.toISOString(),
           subscription_end: subscriptionEnd.toISOString(),
         })
         .eq("email", email);
 
-      if (error) {
-        console.error("Supabase update error:", error);
-      }
+      if (error) console.error("Supabase update error:", error);
     }
 
     const userUpdate = {
-      subscriptionPlan: PRICING.premium.id,
+      subscriptionPlan: plan.id,
       subscriptionStart: now.toISOString(),
       subscriptionEnd: subscriptionEnd.toISOString(),
       subscription: "active",
-      plan: PRICING.premium.id,
+      plan: plan.id,
       subscription_start: now.toISOString(),
       subscription_end: subscriptionEnd.toISOString(),
       expiryDate: subscriptionEnd.toISOString(),

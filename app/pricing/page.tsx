@@ -8,21 +8,21 @@ import { isPremium } from "@/lib/checkPremium";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Shield, Zap, BookOpen, FileText, BarChart3, Clock, Check } from "lucide-react";
+import { Shield, Zap, BookOpen, FileText, BarChart3, Clock } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { PRICING } from "@/lib/pricing-config";
 import { PricingCard } from "@/components/PricingCard";
 
-const features = [
-  { name: "10 Demo Questions", free: true, premium: true },
-  { name: "Mock Test Preview", free: true, premium: true },
-  { name: "All 38 Chapters", free: false, premium: true },
-  { name: "3800+ MCQs", free: false, premium: true },
-  { name: "NEET PYQs (2010-2024)", free: false, premium: true },
-  { name: "Unlimited Mock Tests", free: false, premium: true },
-  { name: "Performance Analytics", free: false, premium: true },
-  { name: "Weak Chapter Analysis", free: false, premium: true },
+const allFeatures = [
+  { name: "10 Demo Questions", free: true, paid: true },
+  { name: "Mock Test Preview", free: true, paid: true },
+  { name: "All 38 Chapters", free: false, paid: true },
+  { name: "3800+ MCQs", free: false, paid: true },
+  { name: "NEET PYQs (2010-2024)", free: false, paid: true },
+  { name: "Unlimited Mock Tests", free: false, paid: true },
+  { name: "Performance Analytics", free: false, paid: true },
+  { name: "Weak Chapter Analysis", free: false, paid: true },
 ];
 
 function PricingContent() {
@@ -34,14 +34,8 @@ function PricingContent() {
 
   const loadRazorpay = () => {
     return new Promise<void>((resolve, reject) => {
-      if (typeof window === "undefined") {
-        reject(new Error("window not defined"));
-        return;
-      }
-      if ((window as any).Razorpay) {
-        resolve();
-        return;
-      }
+      if (typeof window === "undefined") { reject(new Error("window not defined")); return; }
+      if ((window as any).Razorpay) { resolve(); return; }
       const script = document.createElement("script");
       script.src = "https://checkout.razorpay.com/v1/checkout.js";
       script.onload = () => resolve();
@@ -50,14 +44,12 @@ function PricingContent() {
     });
   };
 
-  const handleBuy = async () => {
-    if (!user) {
-      router.push("/login");
-      return;
-    }
+  const handleBuy = async (planId: string) => {
+    if (!user) { router.push("/login"); return; }
     setError(null);
     setLoading(true);
-     try {
+
+    try {
       if (!process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID) {
         setError("Payment system is being set up. Please contact us at +91 9004811546 to subscribe.");
         setLoading(false);
@@ -65,52 +57,49 @@ function PricingContent() {
       }
 
       await loadRazorpay();
+
       const orderRes = await fetch("/api/payment/create-order", {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ planId }),
       }).then((r) => r.json());
+
+      const planData = PRICING[planId as keyof typeof PRICING];
 
       const options = {
         key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
         amount: orderRes.amount,
         currency: orderRes.currency,
         name: "NEET Biology",
-        description: PRICING.premium.description,
+        description: planData.description,
         order_id: orderRes.id,
         handler: async function (response: any) {
           const verifyRes = await fetch("/api/payment/verify", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-           body: JSON.stringify({
-  razorpay_order_id: response.razorpay_order_id,
-  razorpay_payment_id: response.razorpay_payment_id,
-  razorpay_signature: response.razorpay_signature,
-  email: user.email,
-}),
+            body: JSON.stringify({
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_signature: response.razorpay_signature,
+              email: user.email,
+              planId,
+            }),
           }).then((r) => r.json());
 
           if (verifyRes.success) {
             if (verifyRes.user) {
-              const updatedUser = {
-                ...user,
-                ...verifyRes.user,
-                isPaid: true,
-              };
-              updateUser(updatedUser);
+              updateUser({ ...user, ...verifyRes.user, isPaid: true });
             }
-            activateSubscription("NEET Test Series", PRICING.premium.durationDays);
+            activateSubscription("NEET Test Series", planData.durationDays);
             router.push("/dashboard");
           } else {
             setError("Payment verification failed. Please contact support.");
           }
         },
-        prefill: {
-          email: user.email,
-          name: user.name,
-        },
-        theme: {
-          color: "#3399cc",
-        },
+        prefill: { email: user.email, name: user.name },
+        theme: { color: "#3399cc" },
       };
+
       const rzp = new (window as any).Razorpay(options);
       rzp.open();
     } catch (err: any) {
@@ -138,25 +127,82 @@ function PricingContent() {
             </p>
           </div>
 
-          {/* Pricing Cards */}
-<div className={`grid gap-8 max-w-4xl mx-auto mb-16 ${isPaid ? "grid-cols-1 max-w-md" : "grid-cols-1 md:grid-cols-2"}`}>
-  {/* Free card — sirf non-premium users ko dikhao */}
-  {!isPaid && (
-    <PricingCard
-      plan="free"
-      features={features.map((f) => ({ name: f.name, included: f.free }))}
-      userIsPaid={isPaid}
-      userLoggedIn={!!user}
-    />
-  )}
-  <PricingCard
-    plan="premium"
-    features={features.map((f) => ({ name: f.name, included: f.premium }))}
-    userIsPaid={isPaid}
-    userLoggedIn={!!user}
-    onBuy={handleBuy}
-  />
-</div>
+          {/* Error */}
+          {error && (
+            <div className="max-w-4xl mx-auto mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+              {error}
+            </div>
+          )}
+
+          {/* CRASH PACK — TOP FULL WIDTH */}
+          {!isPaid && (
+            <div className="max-w-4xl mx-auto mb-8">
+              <Card className="border-orange-400 bg-orange-50 dark:bg-orange-950/20 relative">
+                <Badge variant="destructive" className="absolute top-4 right-4">
+                  Limited Time Offer
+                </Badge>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-xl flex items-center gap-2">
+                    <Zap className="h-5 w-5 text-orange-500" />
+                    NEET Final 30 Days Crash Pack
+                  </CardTitle>
+                  <CardDescription>Valid Till NEET Exam · Full access for 30 days</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                    <ul className="text-sm text-muted-foreground space-y-1">
+                      <li>✅ All 38 Chapters unlocked</li>
+                      <li>✅ 3800+ MCQs</li>
+                      <li>✅ Full Mock Tests</li>
+                      <li>✅ Performance Analytics</li>
+                    </ul>
+                    <div className="text-center min-w-[140px]">
+                      <div className="text-4xl font-bold text-foreground mb-2">₹299</div>
+                      <Button
+                        className="bg-orange-500 hover:bg-orange-600 text-white border-0 w-full"
+                        onClick={() => handleBuy("crash")}
+                        disabled={loading}
+                      >
+                        Buy Crash Pack
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
+          {/* FREE + PREMIUM PLANS */}
+          <div className={`max-w-4xl mx-auto mb-8 ${isPaid ? "" : "grid grid-cols-1 md:grid-cols-2 gap-8"}`}>
+            {!isPaid && (
+              <PricingCard
+                plan="free"
+                features={allFeatures.map((f) => ({ name: f.name, included: f.free }))}
+                userIsPaid={isPaid}
+                userLoggedIn={!!user}
+              />
+            )}
+            <PricingCard
+              plan="premium"
+              features={allFeatures.map((f) => ({ name: f.name, included: f.paid }))}
+              userIsPaid={isPaid}
+              userLoggedIn={!!user}
+              onBuy={handleBuy}
+            />
+          </div>
+
+          {/* 6 MONTH PLAN */}
+          {!isPaid && (
+            <div className="max-w-sm mx-auto mb-16">
+              <PricingCard
+                plan="sixMonth"
+                features={allFeatures.map((f) => ({ name: f.name, included: f.paid }))}
+                userIsPaid={isPaid}
+                userLoggedIn={!!user}
+                onBuy={handleBuy}
+              />
+            </div>
+          )}
 
           {/* Features Section */}
           <div className="mb-16">
@@ -164,60 +210,12 @@ function PricingContent() {
               What You Get with Premium
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              <Card className="border-border">
-                <CardContent className="pt-6">
-                  <BookOpen className="h-10 w-10 text-primary mb-4" />
-                  <h3 className="font-semibold text-foreground mb-2">38 Complete Chapters</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Full access to Class 11 and Class 12 NCERT Biology chapters
-                  </p>
-                </CardContent>
-              </Card>
-              <Card className="border-border">
-                <CardContent className="pt-6">
-                  <FileText className="h-10 w-10 text-primary mb-4" />
-                  <h3 className="font-semibold text-foreground mb-2">3800+ MCQs</h3>
-                  <p className="text-sm text-muted-foreground">
-                    100 questions per chapter with detailed NCERT-based explanations
-                  </p>
-                </CardContent>
-              </Card>
-              <Card className="border-border">
-                <CardContent className="pt-6">
-                  <Zap className="h-10 w-10 text-primary mb-4" />
-                  <h3 className="font-semibold text-foreground mb-2">NEET PYQs</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Previous year questions from 2010-2024 with solutions
-                  </p>
-                </CardContent>
-              </Card>
-              <Card className="border-border">
-                <CardContent className="pt-6">
-                  <Clock className="h-10 w-10 text-primary mb-4" />
-                  <h3 className="font-semibold text-foreground mb-2">Full Mock Tests</h3>
-                  <p className="text-sm text-muted-foreground">
-                    180-question NEET pattern tests with 3-hour timer
-                  </p>
-                </CardContent>
-              </Card>
-              <Card className="border-border">
-                <CardContent className="pt-6">
-                  <BarChart3 className="h-10 w-10 text-primary mb-4" />
-                  <h3 className="font-semibold text-foreground mb-2">Advanced Analytics</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Detailed performance tracking and weak area identification
-                  </p>
-                </CardContent>
-              </Card>
-              <Card className="border-border">
-                <CardContent className="pt-6">
-                  <Shield className="h-10 w-10 text-primary mb-4" />
-                  <h3 className="font-semibold text-foreground mb-2">Secure & Private</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Your data is secure and your progress is saved automatically
-                  </p>
-                </CardContent>
-              </Card>
+              <Card className="border-border"><CardContent className="pt-6"><BookOpen className="h-10 w-10 text-primary mb-4" /><h3 className="font-semibold text-foreground mb-2">38 Complete Chapters</h3><p className="text-sm text-muted-foreground">Full access to Class 11 and Class 12 NCERT Biology chapters</p></CardContent></Card>
+              <Card className="border-border"><CardContent className="pt-6"><FileText className="h-10 w-10 text-primary mb-4" /><h3 className="font-semibold text-foreground mb-2">3800+ MCQs</h3><p className="text-sm text-muted-foreground">100 questions per chapter with detailed NCERT-based explanations</p></CardContent></Card>
+              <Card className="border-border"><CardContent className="pt-6"><Zap className="h-10 w-10 text-primary mb-4" /><h3 className="font-semibold text-foreground mb-2">NEET PYQs</h3><p className="text-sm text-muted-foreground">Previous year questions from 2010-2024 with solutions</p></CardContent></Card>
+              <Card className="border-border"><CardContent className="pt-6"><Clock className="h-10 w-10 text-primary mb-4" /><h3 className="font-semibold text-foreground mb-2">Full Mock Tests</h3><p className="text-sm text-muted-foreground">180-question NEET pattern tests with 3-hour timer</p></CardContent></Card>
+              <Card className="border-border"><CardContent className="pt-6"><BarChart3 className="h-10 w-10 text-primary mb-4" /><h3 className="font-semibold text-foreground mb-2">Advanced Analytics</h3><p className="text-sm text-muted-foreground">Detailed performance tracking and weak area identification</p></CardContent></Card>
+              <Card className="border-border"><CardContent className="pt-6"><Shield className="h-10 w-10 text-primary mb-4" /><h3 className="font-semibold text-foreground mb-2">Secure & Private</h3><p className="text-sm text-muted-foreground">Your data is secure and your progress is saved automatically</p></CardContent></Card>
             </div>
           </div>
 
@@ -227,39 +225,10 @@ function PricingContent() {
               Frequently Asked Questions
             </h2>
             <div className="space-y-4">
-              <Card className="border-border">
-                <CardContent className="pt-6">
-                  <h3 className="font-semibold text-foreground mb-2">
-                    Can I cancel my subscription anytime?
-                  </h3>
-                  <p className="text-sm text-muted-foreground">
-                    Yes, you can cancel your subscription at any time. Your access will continue
-                    until the end of your billing period.
-                  </p>
-                </CardContent>
-              </Card>
-              <Card className="border-border">
-                <CardContent className="pt-6">
-                  <h3 className="font-semibold text-foreground mb-2">
-                    Is the content based on NCERT?
-                  </h3>
-                  <p className="text-sm text-muted-foreground">
-                    Yes, all questions and explanations are strictly based on NCERT Biology
-                    textbooks and NEET exam patterns.
-                  </p>
-                </CardContent>
-              </Card>
-              <Card className="border-border">
-                <CardContent className="pt-6">
-                  <h3 className="font-semibold text-foreground mb-2">
-                    What payment methods are accepted?
-                  </h3>
-                  <p className="text-sm text-muted-foreground">
-                    We accept UPI, debit cards, credit cards, and net banking through our
-                    secure payment gateway.
-                  </p>
-                </CardContent>
-              </Card>
+              <Card className="border-border"><CardContent className="pt-6"><h3 className="font-semibold text-foreground mb-2">Can I cancel my subscription anytime?</h3><p className="text-sm text-muted-foreground">Yes, you can cancel your subscription at any time. Your access will continue until the end of your billing period.</p></CardContent></Card>
+              <Card className="border-border"><CardContent className="pt-6"><h3 className="font-semibold text-foreground mb-2">Is the content based on NCERT?</h3><p className="text-sm text-muted-foreground">Yes, all questions and explanations are strictly based on NCERT Biology textbooks and NEET exam patterns.</p></CardContent></Card>
+              <Card className="border-border"><CardContent className="pt-6"><h3 className="font-semibold text-foreground mb-2">What payment methods are accepted?</h3><p className="text-sm text-muted-foreground">We accept UPI, debit cards, credit cards, and net banking through our secure payment gateway.</p></CardContent></Card>
+              <Card className="border-border"><CardContent className="pt-6"><h3 className="font-semibold text-foreground mb-2">What is the Crash Pack?</h3><p className="text-sm text-muted-foreground">The Crash Pack gives you 30 days of full access to all features — perfect for last-minute NEET preparation at just ₹299.</p></CardContent></Card>
             </div>
           </div>
         </div>

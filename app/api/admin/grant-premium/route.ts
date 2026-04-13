@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { PRICING, getPlanById, calculateSubscriptionEnd } from "@/lib/pricing-config";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -8,21 +9,22 @@ const supabase = createClient(
 
 export async function POST(req: NextRequest) {
   try {
-    const { email, action } = await req.json();
+    const { email, action, planId = "premium" } = await req.json();
 
     if (!email) {
       return NextResponse.json({ error: "Email required" }, { status: 400 });
     }
 
     if (action === "grant") {
+      const plan = getPlanById(planId);
       const now = new Date();
-      const expiry = new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000);
+      const expiry = calculateSubscriptionEnd(now, plan.durationDays);
 
       const { error } = await supabase
         .from("users")
         .update({
           is_paid: true,
-          subscription_plan: "premium",
+          subscription_plan: plan.id,
           subscription_start: now.toISOString(),
           subscription_end: expiry.toISOString(),
         })
@@ -33,7 +35,10 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: "Database update failed" }, { status: 500 });
       }
 
-      return NextResponse.json({ success: true, message: "Premium granted" });
+      return NextResponse.json({
+        success: true,
+        message: `${plan.id} granted (${plan.durationDays} days)`,
+      });
 
     } else if (action === "revoke") {
       const { error } = await supabase

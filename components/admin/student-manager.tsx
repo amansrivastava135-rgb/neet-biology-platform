@@ -21,6 +21,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Search, Users, Crown, UserCircle, RefreshCw } from "lucide-react";
+import { PRICING } from "@/lib/pricing-config";
 
 type StudentData = {
   id: string;
@@ -29,6 +30,7 @@ type StudentData = {
   isPaid: boolean;
   joinedAt: string;
   subscriptionEnd?: string;
+  subscriptionPlan?: string;
 };
 
 export function StudentManager() {
@@ -36,9 +38,9 @@ export function StudentManager() {
   const [searchQuery, setSearchQuery] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
   const [loadingEmail, setLoadingEmail] = useState<string | null>(null);
+  const [grantPlanId, setGrantPlanId] = useState<Record<string, string>>({});
 
   const loadStudents = async () => {
-    // Supabase se students load karo
     try {
       const res = await fetch("/api/admin/students");
       if (res.ok) {
@@ -52,7 +54,6 @@ export function StudentManager() {
       console.error("Supabase load failed, falling back to localStorage", err);
     }
 
-    // Fallback: localStorage se load karo
     const registeredUsers = JSON.parse(
       localStorage.getItem("neet_registered_users") || "{}"
     );
@@ -66,6 +67,7 @@ export function StudentManager() {
           ? new Date(parseInt(entry.user.id)).toLocaleDateString()
           : "N/A",
         subscriptionEnd: entry.user.subscriptionEnd,
+        subscriptionPlan: entry.user.subscriptionPlan,
       })
     );
     setStudents(studentList);
@@ -76,31 +78,36 @@ export function StudentManager() {
   }, []);
 
   const handleGivePremium = async (email: string) => {
+    const planId = grantPlanId[email] || "premium";
+    const plan = PRICING[planId as keyof typeof PRICING];
+
     setLoadingEmail(email);
     try {
       const res = await fetch("/api/admin/grant-premium", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, action: "grant" }),
+        body: JSON.stringify({ email, action: "grant", planId }),
       });
 
       const data = await res.json();
       if (data.success) {
-        // localStorage bhi update karo (agar same browser mein logged in ho)
+        // localStorage bhi update karo
         const registeredUsers = JSON.parse(
           localStorage.getItem("neet_registered_users") || "{}"
         );
         if (registeredUsers[email]) {
           const now = new Date();
-          const expiry = new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000);
+          const expiry = new Date(
+            now.getTime() + plan.durationDays * 24 * 60 * 60 * 1000
+          );
           registeredUsers[email].user = {
             ...registeredUsers[email].user,
             isPaid: true,
-            subscriptionPlan: "premium",
+            subscriptionPlan: plan.id,
             subscription: "active",
             subscriptionStart: now.toISOString(),
             subscriptionEnd: expiry.toISOString(),
-            plan: "premium",
+            plan: plan.id,
           };
           localStorage.setItem(
             "neet_registered_users",
@@ -108,7 +115,7 @@ export function StudentManager() {
           );
         }
         await loadStudents();
-        alert(`✅ Premium activated for ${email}!`);
+        alert(`✅ ${plan.id} activated for ${email}! (${plan.durationDays} days)`);
       } else {
         alert(`❌ Error: ${data.error}`);
       }
@@ -130,7 +137,6 @@ export function StudentManager() {
 
       const data = await res.json();
       if (data.success) {
-        // localStorage bhi update karo
         const registeredUsers = JSON.parse(
           localStorage.getItem("neet_registered_users") || "{}"
         );
@@ -175,6 +181,7 @@ export function StudentManager() {
 
   return (
     <div className="space-y-6">
+      {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card className="border-border">
           <CardContent className="pt-6">
@@ -183,9 +190,7 @@ export function StudentManager() {
                 <Users className="h-5 w-5 text-blue-500" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-foreground">
-                  {students.length}
-                </p>
+                <p className="text-2xl font-bold text-foreground">{students.length}</p>
                 <p className="text-sm text-muted-foreground">Total Students</p>
               </div>
             </div>
@@ -219,6 +224,7 @@ export function StudentManager() {
         </Card>
       </div>
 
+      {/* Search + Filter */}
       <div className="flex flex-col sm:flex-row gap-4">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -245,6 +251,7 @@ export function StudentManager() {
         </Button>
       </div>
 
+      {/* Table */}
       <Card className="border-border">
         <CardHeader>
           <CardTitle className="text-lg">
@@ -265,6 +272,7 @@ export function StudentManager() {
                     <TableHead>Name</TableHead>
                     <TableHead>Email</TableHead>
                     <TableHead>Status</TableHead>
+                    <TableHead>Plan</TableHead>
                     <TableHead>Joined</TableHead>
                     <TableHead>Expires</TableHead>
                     <TableHead>Action</TableHead>
@@ -273,27 +281,20 @@ export function StudentManager() {
                 <TableBody>
                   {filteredStudents.map((student) => (
                     <TableRow key={student.id}>
-                      <TableCell className="font-medium">
-                        {student.name}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {student.email}
-                      </TableCell>
+                      <TableCell className="font-medium">{student.name}</TableCell>
+                      <TableCell className="text-muted-foreground">{student.email}</TableCell>
                       <TableCell>
-                        <Badge
-                          variant={student.isPaid ? "default" : "secondary"}
-                        >
+                        <Badge variant={student.isPaid ? "default" : "secondary"}>
                           {student.isPaid ? "Premium" : "Free"}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {student.joinedAt}
+                      <TableCell className="text-muted-foreground text-xs">
+                        {student.subscriptionPlan || "—"}
                       </TableCell>
+                      <TableCell className="text-muted-foreground">{student.joinedAt}</TableCell>
                       <TableCell className="text-muted-foreground">
                         {student.subscriptionEnd
-                          ? new Date(
-                              student.subscriptionEnd
-                            ).toLocaleDateString()
+                          ? new Date(student.subscriptionEnd).toLocaleDateString()
                           : "—"}
                       </TableCell>
                       <TableCell>
@@ -304,23 +305,40 @@ export function StudentManager() {
                             onClick={() => handleRevokePremium(student.email)}
                             disabled={loadingEmail === student.email}
                           >
-                            {loadingEmail === student.email
-                              ? "Revoking..."
-                              : "Revoke"}
+                            {loadingEmail === student.email ? "Revoking..." : "Revoke"}
                           </Button>
                         ) : (
-                          <Button
-                            variant="default"
-                            size="sm"
-                            onClick={() => handleGivePremium(student.email)}
-                            disabled={loadingEmail === student.email}
-                            className="gap-1"
-                          >
-                            <Crown className="h-3 w-3" />
-                            {loadingEmail === student.email
-                              ? "Granting..."
-                              : "Give Premium"}
-                          </Button>
+                          <div className="flex items-center gap-2">
+                            {/* Plan selector per row */}
+                            <Select
+                              value={grantPlanId[student.email] || "premium"}
+                              onValueChange={(val) =>
+                                setGrantPlanId((prev) => ({
+                                  ...prev,
+                                  [student.email]: val,
+                                }))
+                              }
+                            >
+                              <SelectTrigger className="h-8 w-28 text-xs">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="crash">Crash (30d)</SelectItem>
+                                <SelectItem value="sixMonth">6 Month</SelectItem>
+                                <SelectItem value="premium">Yearly</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <Button
+                              variant="default"
+                              size="sm"
+                              onClick={() => handleGivePremium(student.email)}
+                              disabled={loadingEmail === student.email}
+                              className="gap-1"
+                            >
+                              <Crown className="h-3 w-3" />
+                              {loadingEmail === student.email ? "Granting..." : "Grant"}
+                            </Button>
+                          </div>
                         )}
                       </TableCell>
                     </TableRow>

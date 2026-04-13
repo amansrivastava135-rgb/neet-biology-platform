@@ -24,6 +24,7 @@ const RecentActivity = dynamic(
   () => import("@/components/dashboard/recent-activity").then(m => m.RecentActivity),
   { loading: () => <div className="h-48 animate-pulse bg-gray-100 rounded-lg" />, ssr: false }
 );
+
 import { QuickActions } from "@/components/dashboard/quick-actions";
 import { ProgressCards } from "@/components/dashboard/progress-cards";
 import { getResults, summarize, TestResult } from "@/lib/analytics";
@@ -34,29 +35,31 @@ function DashboardContent() {
   const { user, isLoading } = useAuth();
   const router = useRouter();
   const [results, setResults] = useState<TestResult[]>([]);
+  const [resultsLoading, setResultsLoading] = useState(true);
   const [progress, setProgress] = useState<UserProgress>({
     totalAttempted: 0,
     totalCorrect: 0,
     chapterProgress: {},
   });
 
+  // Supabase se results load karo
   useEffect(() => {
     if (typeof window !== "undefined") {
-      setResults(getResults());
+      setResultsLoading(true);
+      getResults()
+        .then((data) => setResults(data))
+        .finally(() => setResultsLoading(false));
     }
   }, []);
 
-  // Load progress directly from localStorage per user
+  // Progress localStorage se load karo
   useEffect(() => {
     if (user) {
       try {
         const progressKey = `neet_progress_${user.id}`;
-        // Try per-user key first, fallback to old key
         const stored = localStorage.getItem(progressKey);
         if (stored) {
           setProgress(JSON.parse(stored));
-          // Migrate to per-user key
-          localStorage.setItem(progressKey, stored);
         } else {
           setProgress({ totalAttempted: 0, totalCorrect: 0, chapterProgress: {} });
         }
@@ -108,48 +111,77 @@ function DashboardContent() {
           <DashboardStats progress={progress} />
 
           <div className="mt-6">
-            <ProgressCards results={results} />
+            {resultsLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-5 w-5 animate-spin text-primary mr-2" />
+                <span className="text-sm text-muted-foreground">Loading your results...</span>
+              </div>
+            ) : (
+              <ProgressCards results={results} />
+            )}
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
             <div>
               <h2 className="text-lg font-medium text-foreground mb-2">Strong Topics</h2>
-              <ul className="list-disc list-inside text-sm text-muted-foreground">
-                {strongTopics.map((t) => (
-                  <li key={t.topic}>{t.topic} ({Math.round(t.accuracy)}%)</li>
-                ))}
-              </ul>
+              {resultsLoading ? (
+                <div className="h-24 animate-pulse bg-gray-100 rounded-lg" />
+              ) : (
+                <ul className="list-disc list-inside text-sm text-muted-foreground">
+                  {strongTopics.length > 0 ? (
+                    strongTopics.map((t) => (
+                      <li key={t.topic}>{t.topic} ({Math.round(t.accuracy)}%)</li>
+                    ))
+                  ) : (
+                    <li>No data yet — attempt some tests!</li>
+                  )}
+                </ul>
+              )}
             </div>
             <div>
               <h2 className="text-lg font-medium text-foreground mb-2">Weak Topics</h2>
-              <ul className="list-disc list-inside text-sm text-muted-foreground">
-                {weakTopics.map((t) => (
-                  <li key={t.topic}>{t.topic} ({Math.round(t.accuracy)}%)</li>
-                ))}
-              </ul>
+              {resultsLoading ? (
+                <div className="h-24 animate-pulse bg-gray-100 rounded-lg" />
+              ) : (
+                <ul className="list-disc list-inside text-sm text-muted-foreground">
+                  {weakTopics.length > 0 ? (
+                    weakTopics.map((t) => (
+                      <li key={t.topic}>{t.topic} ({Math.round(t.accuracy)}%)</li>
+                    ))
+                  ) : (
+                    <li>No data yet — attempt some tests!</li>
+                  )}
+                </ul>
+              )}
             </div>
           </div>
 
           <div className="mt-6">
             <h2 className="text-lg font-medium text-foreground mb-2">Recent Tests</h2>
-            <table className="w-full text-sm">
-              <thead>
-                <tr>
-                  <th className="text-left">Date</th>
-                  <th className="text-left">Score</th>
-                  <th className="text-left">Accuracy</th>
-                </tr>
-              </thead>
-              <tbody>
-                {recentHistory.map((r, idx) => (
-                  <tr key={idx}>
-                    <td>{new Date(r.date).toLocaleDateString()}</td>
-                    <td>{r.score}</td>
-                    <td>{r.accuracy}%</td>
+            {resultsLoading ? (
+              <div className="h-24 animate-pulse bg-gray-100 rounded-lg" />
+            ) : recentHistory.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No tests attempted yet.</p>
+            ) : (
+              <table className="w-full text-sm">
+                <thead>
+                  <tr>
+                    <th className="text-left">Date</th>
+                    <th className="text-left">Score</th>
+                    <th className="text-left">Accuracy</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {recentHistory.map((r, idx) => (
+                    <tr key={idx}>
+                      <td>{new Date(r.date).toLocaleDateString()}</td>
+                      <td>{r.score}</td>
+                      <td>{r.accuracy}%</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
@@ -166,7 +198,7 @@ function DashboardContent() {
     </div>
   );
 }
- 
+
 export default function DashboardPage() {
   return (
     <AuthProvider>

@@ -122,7 +122,11 @@ export function ResultPage({
       topics: Object.keys(topicPerformanceMap),
       topicPerformance,
     };
-    saveResult(result);
+
+    // async IIFE — saveResult ab Supabase mein save karega
+    (async () => {
+      await saveResult(result);
+    })();
 
     if (testType === "full") {
       const storedUser = localStorage.getItem("neet_user");
@@ -144,6 +148,7 @@ export function ResultPage({
       }
     }
 
+    // Progress — localStorage mein save karo
     try {
       const storedUser = localStorage.getItem("neet_user");
       if (storedUser) {
@@ -381,7 +386,7 @@ export function ResultPage({
         </Card>
 
         {testType === "full" && (
-  <Card className="border-border mb-8">
+          <Card className="border-border mb-8">
             <CardHeader>
               <CardTitle className="text-lg flex items-center gap-2">
                 <Trophy className="h-5 w-5 text-yellow-500" />

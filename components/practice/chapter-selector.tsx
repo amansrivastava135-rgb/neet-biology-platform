@@ -23,12 +23,11 @@ type SetInfo = {
   type: "auto" | "manual";
 };
 
-// Supabase se sets fetch karo
 async function getSetsForChapter(chapterId: number): Promise<SetInfo[]> {
   try {
     const res = await fetch(`/api/questions?chapterId=${chapterId}`);
+    if (!res.ok) return [];
     const data = await res.json();
-    // PYQ Set remove karo — alag tab hai
     const sets = (data.sets || []).filter((s: SetInfo) => s.label !== "PYQ Set");
     return sets;
   } catch {
@@ -36,21 +35,21 @@ async function getSetsForChapter(chapterId: number): Promise<SetInfo[]> {
   }
 }
 
-// Supabase se chapter question count fetch karo
 async function getChapterQuestionCount(chapterId: number): Promise<number> {
   try {
-    const res = await fetch(`/api/questions?chapterId=${chapterId}`);
+    const res = await fetch(`/api/questions/count?chapterId=${chapterId}`);
+    if (!res.ok) return 0;
     const data = await res.json();
-    return data.questions?.length || 0;
+    return data.count || 0;
   } catch {
     return 0;
   }
 }
 
-// Supabase se PYQ data fetch karo
 async function fetchPYQData() {
   try {
     const res = await fetch(`/api/questions?source=PYQ`);
+    if (!res.ok) return [];
     const data = await res.json();
     return data.questions || [];
   } catch {
@@ -58,7 +57,6 @@ async function fetchPYQData() {
   }
 }
 
-// PYQ Tab Component
 function PYQTab({
   onStartPYQYear,
   onStartPYQChapter,
@@ -80,7 +78,6 @@ function PYQTab({
     });
   }, []);
 
-  // Group by year
   const yearMap: Record<number, number> = {};
   pyqQuestions.forEach((q) => {
     if (q.year) yearMap[q.year] = (yearMap[q.year] || 0) + 1;
@@ -89,7 +86,6 @@ function PYQTab({
     .map(([year, count]) => ({ year: parseInt(year), count }))
     .sort((a, b) => b.year - a.year);
 
-  // Group by chapter
   const chapterMap: Record<number, number> = {};
   pyqQuestions.forEach((q) => {
     chapterMap[q.chapter_id] = (chapterMap[q.chapter_id] || 0) + 1;
@@ -108,7 +104,6 @@ function PYQTab({
 
   return (
     <div>
-      {/* Filter Toggle */}
       <div className="flex items-center gap-2 mb-6">
         <span className="text-sm text-muted-foreground">Filter by:</span>
         <div className="flex rounded-lg border border-border overflow-hidden">
@@ -135,14 +130,15 @@ function PYQTab({
         </div>
       </div>
 
-      {/* Year Filter View */}
       {pyqFilter === "year" && (
         <div>
           {pyqByYear.length === 0 ? (
             <div className="text-center py-12">
               <Calendar className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
               <p className="text-muted-foreground font-medium">No PYQ questions available yet</p>
-              <p className="text-sm text-muted-foreground mt-1">Admin can add PYQ questions from the admin panel</p>
+              <p className="text-sm text-muted-foreground mt-1">
+                Admin can add PYQ questions from the admin panel
+              </p>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -190,7 +186,6 @@ function PYQTab({
         </div>
       )}
 
-      {/* Chapter Filter View */}
       {pyqFilter === "chapter" && (
         <div>
           {pyqByChapter.length === 0 ? (
@@ -257,7 +252,6 @@ function PYQTab({
   );
 }
 
-// Chapter card with live question count
 function ChapterCard({
   chapter,
   index,
@@ -272,10 +266,8 @@ function ChapterCard({
   const [questionCount, setQuestionCount] = useState<number | null>(null);
 
   useEffect(() => {
-    if (isUnlocked) {
-      getChapterQuestionCount(chapter.id).then(setQuestionCount);
-    }
-  }, [chapter.id, isUnlocked]);
+    getChapterQuestionCount(chapter.id).then(setQuestionCount);
+  }, [chapter.id]);
 
   return (
     <Card
@@ -300,7 +292,11 @@ function ChapterCard({
           <div className="flex items-center gap-2">
             <BookOpen className="h-4 w-4 text-muted-foreground" />
             <span className="text-sm text-muted-foreground">
-              {questionCount !== null ? `${questionCount} MCQs` : `${chapter.questionCount} MCQs`}
+              {questionCount !== null
+                ? `${questionCount} MCQs`
+                : chapter.questionCount > 0
+                ? `${chapter.questionCount} MCQs`
+                : "Loading..."}
             </span>
           </div>
           <Badge variant="secondary" className="text-xs">PYQ + NCERT</Badge>
@@ -355,10 +351,11 @@ export function ChapterSelector({
     <div className="container mx-auto px-4 py-8">
       <div className="text-center mb-8">
         <h1 className="text-3xl font-bold text-foreground mb-2">Chapter-wise Practice</h1>
-        <p className="text-muted-foreground">Select a chapter to start practicing NCERT-based MCQs</p>
+        <p className="text-muted-foreground">
+          Select a chapter to start practicing NCERT-based MCQs
+        </p>
       </div>
 
-      {/* Demo Section */}
       {!isPaidUser && (
         <Card className="mb-8 border-primary/50 bg-primary/5">
           <CardContent className="py-6">
@@ -383,7 +380,6 @@ export function ChapterSelector({
         </Card>
       )}
 
-      {/* Set Selector Modal */}
       {selectedChapter && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
           <Card className="w-full max-w-md border-border">
@@ -405,7 +401,9 @@ export function ChapterSelector({
               ) : sets.length === 0 ? (
                 <div className="text-center py-6">
                   <p className="text-muted-foreground text-sm">No questions available yet.</p>
-                  <p className="text-muted-foreground text-xs mt-1">Admin can add questions from the admin panel.</p>
+                  <p className="text-muted-foreground text-xs mt-1">
+                    Admin can add questions from the admin panel.
+                  </p>
                 </div>
               ) : (
                 sets.map((set) => (
@@ -432,7 +430,6 @@ export function ChapterSelector({
         </div>
       )}
 
-      {/* Tabs */}
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "11" | "12" | "pyq")}>
         <div className="overflow-x-auto mb-8">
           <TabsList className="grid w-full max-w-lg mx-auto grid-cols-3 min-w-[320px]">

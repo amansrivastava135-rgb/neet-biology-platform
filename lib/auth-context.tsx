@@ -17,6 +17,8 @@ export type User = {
   subscriptionStart?: string;
   subscriptionEnd?: string;
   subscription?: "free" | "active" | "expired";
+  plan?: string;                 
+  subscription_end?: string;     
   isAdmin: boolean;
 };
 

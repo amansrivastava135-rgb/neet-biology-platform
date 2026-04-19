@@ -25,9 +25,9 @@ export function Header() {
             <BookOpen className="h-6 w-6 text-primary-foreground" />
           </div>
           <div className="hidden sm:block">
-            <p className="text-sm font-bold text-foreground leading-tight">Dr. Amankumar Srivastav</p>
-            <p className="text-xs text-muted-foreground">Pvt Tutorials</p>
-          </div>
+  <p className="text-sm font-bold text-foreground leading-tight">MASTER360</p>
+  <p className="text-xs text-muted-foreground">Dr. Amankumar Srivastav</p>
+</div>
         </Link>
 
         {/* Desktop Navigation */}

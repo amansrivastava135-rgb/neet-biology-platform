@@ -12,10 +12,10 @@ export function Footer() {
               <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-sidebar-primary">
                 <BookOpen className="h-6 w-6 text-sidebar-primary-foreground" />
               </div>
-              <div>
-                <p className="text-sm font-bold leading-tight">Dr. Amankumar Srivastav</p>
-                <p className="text-xs text-sidebar-foreground/70">Pvt Tutorials</p>
-              </div>
+             <div>
+  <p className="text-sm font-bold leading-tight">MASTER360</p>
+  <p className="text-xs text-sidebar-foreground/70">Dr. Amankumar Srivastav</p>
+</div>
             </div>
             <p className="text-sm text-sidebar-foreground/80 max-w-md leading-relaxed">
               Master NCERT Biology for NEET with structured practice, previous year questions, 

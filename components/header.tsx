@@ -10,7 +10,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Menu, X, User, LogOut, LayoutDashboard, BookOpen, FileText, Settings } from "lucide-react";
+import { Menu, X, User, LogOut, LayoutDashboard, BookOpen, FileText, Settings, History } from "lucide-react";
 import { useState } from "react";
 
 export function Header() {
@@ -48,7 +48,7 @@ export function Header() {
           )}
         </nav>
 
-        {/* Desktop Auth Buttons */}
+        {/* Desktop Auth */}
         <div className="hidden md:flex items-center gap-3">
           {user ? (
             <DropdownMenu>
@@ -77,6 +77,13 @@ export function Header() {
                     Mock Tests
                   </Link>
                 </DropdownMenuItem>
+                {/* Result History — yahan add kiya */}
+                <DropdownMenuItem asChild>
+                  <Link href="/results" className="flex items-center gap-2 cursor-pointer">
+                    <History className="h-4 w-4" />
+                    Result History
+                  </Link>
+                </DropdownMenuItem>
                 {user.isAdmin && (
                   <>
                     <DropdownMenuSeparator />
@@ -89,7 +96,10 @@ export function Header() {
                   </>
                 )}
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={logout} className="flex items-center gap-2 cursor-pointer text-destructive">
+                <DropdownMenuItem
+                  onClick={logout}
+                  className="flex items-center gap-2 cursor-pointer text-destructive"
+                >
                   <LogOut className="h-4 w-4" />
                   Logout
                 </DropdownMenuItem>
@@ -161,6 +171,14 @@ export function Header() {
                   onClick={() => setMobileMenuOpen(false)}
                 >
                   Dashboard
+                </Link>
+                {/* Result History mobile mein bhi */}
+                <Link
+                  href="/results"
+                  className="px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  Result History
                 </Link>
                 <button
                   onClick={() => {

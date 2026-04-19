@@ -109,6 +109,7 @@ export function ResultPage({
 
     const result: TestResult = {
       testId: `${Date.now()}`,
+      testLabel: testLabel || undefined, // naam pass karo
       date: new Date().toISOString(),
       testType,
       score,
@@ -123,7 +124,6 @@ export function ResultPage({
       topicPerformance,
     };
 
-    // async IIFE — saveResult ab Supabase mein save karega
     (async () => {
       await saveResult(result);
     })();
@@ -148,7 +148,6 @@ export function ResultPage({
       }
     }
 
-    // Progress — localStorage mein save karo
     try {
       const storedUser = localStorage.getItem("neet_user");
       if (storedUser) {

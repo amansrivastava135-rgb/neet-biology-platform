@@ -8,6 +8,7 @@ export type TopicPerformance = {
 
 export type TestResult = {
   testId: string;
+  testLabel?: string; // test ka naam — "Mock Test 1", "Cell Biology — Set 2" etc
   date: string;
   testType?: string;
   score: number;
@@ -22,7 +23,6 @@ export type TestResult = {
   topicPerformance: TopicPerformance[];
 };
 
-// Current logged in user ka id lo
 function getUserId(): string | null {
   try {
     const storedUser = localStorage.getItem("neet_user");
@@ -34,14 +34,11 @@ function getUserId(): string | null {
   return null;
 }
 
-// ✅ Supabase mein save karo
 export async function saveResult(result: TestResult): Promise<void> {
   const userId = getUserId();
 
-  // Supabase mein save karo
   if (userId) {
     try {
-      // Duplicate check — same type + attempted + 2 second window
       const { data: existing } = await supabase
         .from("test_results")
         .select("id, date, test_type, attempted")
@@ -58,6 +55,7 @@ export async function saveResult(result: TestResult): Promise<void> {
         const { error } = await supabase.from("test_results").insert({
           user_id: userId,
           test_id: result.testId,
+          test_label: result.testLabel || null, // naam save karo
           test_type: result.testType || "chapter",
           date: result.date,
           score: result.score,
@@ -74,7 +72,6 @@ export async function saveResult(result: TestResult): Promise<void> {
 
         if (error) {
           console.error("Supabase saveResult error:", error);
-          // Fallback — localStorage mein save karo
           saveToLocalStorage(result, userId);
         }
       }
@@ -83,12 +80,10 @@ export async function saveResult(result: TestResult): Promise<void> {
       saveToLocalStorage(result, userId);
     }
   } else {
-    // User logged in nahi — localStorage mein save karo
     saveToLocalStorage(result, null);
   }
 }
 
-// ✅ Supabase se results fetch karo
 export async function getResults(): Promise<TestResult[]> {
   if (typeof window === "undefined") return [];
 
@@ -101,13 +96,14 @@ export async function getResults(): Promise<TestResult[]> {
         .select("*")
         .eq("user_id", userId)
         .order("date", { ascending: false })
-        .limit(50);
+        .limit(100);
 
       if (error) throw error;
 
       if (data && data.length > 0) {
         return data.map((r) => ({
           testId: r.test_id,
+          testLabel: r.test_label || null,
           date: r.date,
           testType: r.test_type,
           score: r.score,
@@ -123,14 +119,11 @@ export async function getResults(): Promise<TestResult[]> {
         }));
       }
 
-      // Supabase mein kuch nahi — localStorage se migrate karo
       const localResults = getFromLocalStorage(userId);
       if (localResults.length > 0) {
-        console.log("Migrating localStorage results to Supabase...");
         for (const result of localResults) {
           await saveResult(result);
         }
-        // Migration ke baad localStorage clear karo
         clearLocalStorage(userId);
         return localResults;
       }
@@ -145,18 +138,12 @@ export async function getResults(): Promise<TestResult[]> {
   return getFromLocalStorage(null);
 }
 
-// ✅ Results clear karo (Supabase + localStorage dono)
 export async function clearResults(): Promise<void> {
   if (typeof window === "undefined") return;
-
   const userId = getUserId();
-
   if (userId) {
     try {
-      await supabase
-        .from("test_results")
-        .delete()
-        .eq("user_id", userId);
+      await supabase.from("test_results").delete().eq("user_id", userId);
     } catch (err) {
       console.error("clearResults error:", err);
     }
@@ -164,19 +151,13 @@ export async function clearResults(): Promise<void> {
   }
 }
 
-// ✅ Summarize function — unchanged
 export function summarize(results: TestResult[]) {
   const totalTests = results.length;
   const avgAccuracy =
     totalTests > 0
-      ? Math.round(
-          results.reduce((sum, r) => sum + r.accuracy, 0) / totalTests
-        )
+      ? Math.round(results.reduce((sum, r) => sum + r.accuracy, 0) / totalTests)
       : 0;
-  const bestScore = results.reduce(
-    (max, r) => (r.score > max ? r.score : max),
-    0
-  );
+  const bestScore = results.reduce((max, r) => (r.score > max ? r.score : max), 0);
 
   const topicMap: Record<string, { correct: number; attempted: number }> = {};
   results.forEach((r) => {
@@ -197,8 +178,6 @@ export function summarize(results: TestResult[]) {
   return { totalTests, avgAccuracy, bestScore, topicStats };
 }
 
-// ─── localStorage helpers (fallback) ───────────────────────────────
-
 function getStorageKey(userId: string | null): string {
   return userId ? `testHistory_${userId}` : "testHistory";
 }
@@ -209,9 +188,7 @@ function saveToLocalStorage(result: TestResult, userId: string | null): void {
     const existing = getFromLocalStorage(userId);
     const isDuplicate = existing.some(
       (r) =>
-        Math.abs(
-          new Date(r.date).getTime() - new Date(result.date).getTime()
-        ) < 2000 &&
+        Math.abs(new Date(r.date).getTime() - new Date(result.date).getTime()) < 2000 &&
         r.testType === result.testType &&
         r.attempted === result.attempted
     );

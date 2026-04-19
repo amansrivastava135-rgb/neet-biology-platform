@@ -10,9 +10,10 @@ export async function premiumGuard(req: NextRequest): Promise<boolean> {
 
   try {
     const { payload } = await jwtVerify(token, JWT_SECRET);
-    if (payload.isPremium === true || payload.isPaid === true) {
+
+    if (payload.isPaid === true) {
       const subEnd = payload.subscriptionEnd as string | undefined;
-      if (!subEnd) return payload.isPaid === true;
+      if (!subEnd) return true;
       return new Date(subEnd).getTime() > Date.now();
     }
     return false;

@@ -1,38 +1,28 @@
 import { NextResponse } from "next/server";
-import { SignJWT } from "jose";
+import { signToken, getTokenCookieOptions } from "@/lib/auth";
 
 export async function POST(req: Request) {
   try {
     const body = await req.json();
     const user = body.user;
 
-    if (!user) {
-      return NextResponse.json({ error: "No user provided" }, { status: 400 });
+    if (!user?.id || !user?.email || !user?.name) {
+      return NextResponse.json({ error: "Invalid user payload" }, { status: 400 });
     }
 
-    const secret = new TextEncoder().encode(process.env.JWT_SECRET);
-
-    const token = await new SignJWT({
+    const token = await signToken({
       id: user.id,
       email: user.email,
+      name: user.name,
       isAdmin: user.isAdmin ?? false,
       isPaid: user.isPaid ?? false,
-      isPremium: user.isPaid ?? false,
-      subscriptionEnd: user.subscriptionEnd ?? null,
       subscriptionPlan: user.subscriptionPlan ?? "free",
-    })
-      .setProtectedHeader({ alg: "HS256" })
-      .setExpirationTime("365d")
-      .sign(secret);
+      subscriptionEnd: user.subscriptionEnd ?? undefined,
+    });
 
     const response = NextResponse.json({ success: true });
-    response.cookies.set("neet_token", token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      maxAge: 60 * 60 * 24 * 365,
-      path: "/",
-    });
+    const opts = getTokenCookieOptions();
+    response.cookies.set(opts.name, token, opts);
 
     return response;
   } catch (err) {

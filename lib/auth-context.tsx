@@ -1,13 +1,5 @@
 "use client";
 
-async function setJWTCookie(user: User) {
-  await fetch("/api/auth/login", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ user }),
-  });
-}
-
 import {
   createContext,
   useContext,
@@ -21,17 +13,11 @@ export type User = {
   email: string;
   name: string;
   isPaid: boolean;
-  // naye plans add kiye
   subscriptionPlan?: "free" | "crash" | "sixMonth" | "premium" | "expired";
   subscriptionStart?: string;
   subscriptionEnd?: string;
   subscription?: "free" | "active" | "expired";
-  plan?: string;
-  expiryDate?: string;
-  subscription_start?: string;
-  subscription_end?: string;
   isAdmin: boolean;
-  devices?: string[];
 };
 
 export type UserProgress = {
@@ -46,10 +32,10 @@ type AuthContextType = {
   isLoading: boolean;
   login: (email: string, password: string) => Promise<boolean>;
   signup: (email: string, password: string, name: string) => Promise<boolean>;
-  logout: () => void;
+  logout: () => Promise<void>;
   updateProgress: (chapterId: number, isCorrect: boolean) => void;
-  updateUser: (u: User) => void;
-  activateSubscription: (plan: string, days: number) => void;
+  updateUser: (u: User) => Promise<void>;
+  activateSubscription: (plan: string, days: number) => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -64,7 +50,6 @@ function progressKey(userId: string) {
   return `neet_progress_${userId}`;
 }
 
-// Demo users — sirf development mein kaam karenge
 const DEMO_USERS: Record<string, { password: string; user: User }> =
   process.env.NODE_ENV === "development"
     ? {
@@ -92,7 +77,6 @@ function applySubscription(u: User, plan: string, days: number): User {
     subscriptionStart: now.toISOString(),
     subscriptionEnd: expiry.toISOString(),
     subscription: "active",
-    plan,
     isPaid: true,
   };
 }
@@ -102,7 +86,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [progress, setProgress] = useState<UserProgress>(EMPTY_PROGRESS);
   const [isLoading, setIsLoading] = useState(true);
 
-  // localStorage se user load karo
   useEffect(() => {
     const storedUser = localStorage.getItem("neet_user");
     if (storedUser) {
@@ -110,11 +93,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const parsed: User = JSON.parse(storedUser);
         setUser(parsed);
         const storedProgress = localStorage.getItem(progressKey(parsed.id));
-        if (storedProgress) {
-          setProgress(JSON.parse(storedProgress));
-        } else {
-          setProgress(EMPTY_PROGRESS);
-        }
+        setProgress(storedProgress ? JSON.parse(storedProgress) : EMPTY_PROGRESS);
       } catch {
         setUser(null);
       }
@@ -123,18 +102,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const login = async (email: string, password: string): Promise<boolean> => {
-    // Demo users check — sirf dev mein
     const demoUser = DEMO_USERS[email];
     if (demoUser && demoUser.password === password) {
       setUser(demoUser.user);
       const storedProgress = localStorage.getItem(progressKey(demoUser.user.id));
       setProgress(storedProgress ? JSON.parse(storedProgress) : EMPTY_PROGRESS);
       localStorage.setItem("neet_user", JSON.stringify(demoUser.user));
-      await setJWTCookie(demoUser.user);
+      await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user: demoUser.user }),
+      });
       return true;
     }
 
-    // Supabase se login
     const res = await fetch("/api/auth/login-user", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -149,7 +130,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const storedProgress = localStorage.getItem(progressKey(data.user.id));
       setProgress(storedProgress ? JSON.parse(storedProgress) : EMPTY_PROGRESS);
       localStorage.setItem("neet_user", JSON.stringify(data.user));
-      // JWT cookie login-user route ne already set kar di hai
       return true;
     }
 
@@ -161,7 +141,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     password: string,
     name: string
   ): Promise<boolean> => {
-    // Demo users ke email se signup block karo
     if (DEMO_USERS[email]) return false;
 
     const res = await fetch("/api/auth/signup", {
@@ -186,32 +165,44 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(newUser);
       setProgress(EMPTY_PROGRESS);
       localStorage.setItem("neet_user", JSON.stringify(newUser));
-      await setJWTCookie(newUser);
+      await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user: newUser }),
+      });
       return true;
     }
 
     return false;
   };
 
-  const logout = async () => {
+  const logout = async (): Promise<void> => {
     setUser(null);
     setProgress(EMPTY_PROGRESS);
     localStorage.removeItem("neet_user");
     await fetch("/api/auth/logout", { method: "POST" });
   };
 
-  const updateUser = async (u: User) => {
+  const updateUser = async (u: User): Promise<void> => {
     setUser(u);
     localStorage.setItem("neet_user", JSON.stringify(u));
-    await setJWTCookie(u);
+    await fetch("/api/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ user: u }),
+    });
   };
 
-  const activateSubscription = async (plan: string, days: number) => {
+  const activateSubscription = async (plan: string, days: number): Promise<void> => {
     if (!user) return;
     const updated = applySubscription(user, plan, days);
     setUser(updated);
     localStorage.setItem("neet_user", JSON.stringify(updated));
-    await setJWTCookie(updated);
+    await fetch("/api/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ user: updated }),
+    });
   };
 
   const updateProgress = (chapterId: number, isCorrect: boolean) => {

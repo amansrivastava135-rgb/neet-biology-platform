@@ -10,7 +10,6 @@ export interface JWTUser {
   name: string;
   isAdmin: boolean;
   isPaid: boolean;
-  isPremium: boolean;
   subscriptionPlan?: string;
   subscriptionEnd?: string;
 }
@@ -19,14 +18,34 @@ export async function signToken(user: JWTUser): Promise<string> {
   return new SignJWT({ ...user })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
-    .setExpirationTime("365d") // consistent everywhere
+    .setExpirationTime("365d")
     .sign(JWT_SECRET);
 }
 
 export async function verifyToken(token: string): Promise<JWTUser | null> {
   try {
     const { payload } = await jwtVerify(token, JWT_SECRET);
-    return payload as unknown as JWTUser;
+
+    // Safe validation — agar koi field missing ho to null return karo
+    if (
+      typeof payload.id !== "string" ||
+      typeof payload.email !== "string" ||
+      typeof payload.name !== "string" ||
+      typeof payload.isAdmin !== "boolean" ||
+      typeof payload.isPaid !== "boolean"
+    ) {
+      return null;
+    }
+
+    return {
+      id: payload.id,
+      email: payload.email,
+      name: payload.name,
+      isAdmin: payload.isAdmin,
+      isPaid: payload.isPaid,
+      subscriptionPlan: payload.subscriptionPlan as string | undefined,
+      subscriptionEnd: payload.subscriptionEnd as string | undefined,
+    };
   } catch {
     return null;
   }
@@ -45,7 +64,7 @@ export function getTokenCookieOptions() {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax" as const,
-    maxAge: 60 * 60 * 24 * 365, // 365 days
+    maxAge: 60 * 60 * 24 * 365,
     path: "/",
   };
 }

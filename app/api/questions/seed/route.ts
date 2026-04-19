@@ -1,19 +1,20 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { supabaseAdmin } from "@/lib/supabase-server";
+import { getCurrentUser } from "@/lib/auth";
 import { sampleQuestions } from "@/lib/data";
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
 
 const SET_SIZE = 90;
 
 export async function POST() {
+  // Sirf admin seed kar sakta hai
+  const user = await getCurrentUser();
+  if (!user || !user.isAdmin) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
   let inserted = 0;
   let skipped = 0;
 
-  // Chapter wise group karo
   const byChapter: Record<number, typeof sampleQuestions> = {};
   for (const q of sampleQuestions) {
     if (!byChapter[q.chapterId]) byChapter[q.chapterId] = [];
@@ -21,8 +22,7 @@ export async function POST() {
   }
 
   for (const [chapterId, questions] of Object.entries(byChapter)) {
-    // Existing count
-    const { count } = await supabase
+    const { count } = await supabaseAdmin
       .from("questions")
       .select("*", { count: "exact", head: true })
       .eq("chapter_id", parseInt(chapterId));
@@ -30,8 +30,7 @@ export async function POST() {
     let currentCount = count || 0;
 
     for (const q of questions) {
-      // Duplicate check
-      const { data: existing } = await supabase
+      const { data: existing } = await supabaseAdmin
         .from("questions")
         .select("id")
         .eq("chapter_id", q.chapterId)
@@ -45,7 +44,7 @@ export async function POST() {
 
       const setNumber = Math.floor(currentCount / SET_SIZE) + 1;
 
-      const { error } = await supabase.from("questions").insert({
+      const { error } = await supabaseAdmin.from("questions").insert({
         question: q.question,
         option_a: q.options.A,
         option_b: q.options.B,
@@ -71,6 +70,6 @@ export async function POST() {
     success: true,
     inserted,
     skipped,
-    message: `${inserted} questions inserted, ${skipped} skipped (duplicates)`,
+    message: `${inserted} questions inserted, ${skipped} skipped`,
   });
 }

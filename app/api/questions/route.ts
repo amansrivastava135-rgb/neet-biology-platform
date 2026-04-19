@@ -1,25 +1,41 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+import { supabaseAdmin } from "@/lib/supabase-server";
+import { getCurrentUser } from "@/lib/auth";
 
 const SET_SIZE = 90;
 
 export async function GET(req: Request) {
+  // Auth check — login hona zaroori hai
+  const user = await getCurrentUser();
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const { searchParams } = new URL(req.url);
   const chapterId = searchParams.get("chapterId");
   const setNumber = searchParams.get("setNumber");
   const source = searchParams.get("source");
   const year = searchParams.get("year");
 
-  let query = supabase.from("questions").select("*");
+  // Premium content check — paid hona zaroori hai
+  if (!user.isPaid) {
+    // Free users sirf demo questions dekh sakte hain
+    const isDemoRequest = searchParams.get("demo") === "true";
+    if (!isDemoRequest) {
+      return NextResponse.json({ error: "Subscription required" }, { status: 403 });
+    }
+  }
+
+  let query = supabaseAdmin.from("questions").select("*");
 
   if (chapterId) query = query.eq("chapter_id", parseInt(chapterId));
   if (source) query = query.eq("source", source);
   if (year) query = query.eq("year", parseInt(year));
+
+  // Free users ke liye demo mode — sirf pehle 10 questions
+  if (!user.isPaid) {
+    query = query.limit(10);
+  }
 
   const { data: questions, error } = await query.order("id", { ascending: true });
 
@@ -49,6 +65,12 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
+  // Sirf admin POST kar sakta hai
+  const user = await getCurrentUser();
+  if (!user || !user.isAdmin) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
   const body = await req.json();
   const {
     question,
@@ -68,7 +90,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Required fields missing" }, { status: 400 });
   }
 
-  const { data: existing } = await supabase
+  const { data: existing } = await supabaseAdmin
     .from("questions")
     .select("id")
     .eq("chapter_id", chapter_id)
@@ -82,14 +104,14 @@ export async function POST(req: Request) {
     );
   }
 
-  const { count } = await supabase
+  const { count } = await supabaseAdmin
     .from("questions")
     .select("*", { count: "exact", head: true })
     .eq("chapter_id", chapter_id);
 
   const autoSetNumber = Math.floor((count || 0) / SET_SIZE) + 1;
 
-  const { data, error } = await supabase
+  const { data, error } = await supabaseAdmin
     .from("questions")
     .insert({
       question,
@@ -116,6 +138,12 @@ export async function POST(req: Request) {
 }
 
 export async function DELETE(req: Request) {
+  // Sirf admin DELETE kar sakta hai
+  const user = await getCurrentUser();
+  if (!user || !user.isAdmin) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
   const { searchParams } = new URL(req.url);
   const id = searchParams.get("id");
 
@@ -123,7 +151,7 @@ export async function DELETE(req: Request) {
     return NextResponse.json({ error: "id required" }, { status: 400 });
   }
 
-  const { error } = await supabase
+  const { error } = await supabaseAdmin
     .from("questions")
     .delete()
     .eq("id", parseInt(id));

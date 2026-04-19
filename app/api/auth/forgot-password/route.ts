@@ -1,14 +1,11 @@
 import { Resend } from "resend";
 import { NextResponse } from "next/server";
+import { supabaseAdmin } from "@/lib/supabase-server";
+import bcrypt from "bcryptjs";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
-const resetTokenStore = new Map<string, { token: string; expires: number }>();
-
-function generateToken() {
-  return Math.random().toString(36).substring(2) + Date.now().toString(36);
-}
-
+// Token Supabase ke otp_store mein save hoga — Map nahi
 export async function POST(req: Request) {
   const { email } = await req.json();
 
@@ -16,11 +13,37 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Email required" }, { status: 400 });
   }
 
-  const token = generateToken();
-  const expires = Date.now() + 30 * 60 * 1000; // 30 minutes
-  resetTokenStore.set(email, { token, expires });
+  // User exists check
+  const { data: user } = await supabaseAdmin
+    .from("users")
+    .select("id")
+    .eq("email", email.trim().toLowerCase())
+    .single();
 
-  const resetLink = `${process.env.NEXT_PUBLIC_APP_URL || "https://neet-biology-platform.vercel.app"}/reset-password?token=${token}&email=${encodeURIComponent(email)}`;
+  // Email exist kare ya na kare — same response do (enumeration prevent)
+  if (!user) {
+    return NextResponse.json({ success: true });
+  }
+
+  // Secure random token generate karo
+  const tokenRaw = crypto.randomUUID() + crypto.randomUUID();
+  const token = tokenRaw.replace(/-/g, "");
+  const expires_at = Date.now() + 30 * 60 * 1000; // 30 min
+
+  // otp_store mein save karo (same table reuse)
+  const { error: dbError } = await supabaseAdmin
+    .from("otp_store")
+    .upsert(
+      { email: email.trim().toLowerCase(), otp: token, expires_at },
+      { onConflict: "email" }
+    );
+
+  if (dbError) {
+    console.error("Token store error:", dbError);
+    return NextResponse.json({ error: "Server error" }, { status: 500 });
+  }
+
+  const resetLink = `${process.env.NEXT_PUBLIC_APP_URL}/reset-password?token=${token}&email=${encodeURIComponent(email)}`;
 
   try {
     await resend.emails.send({
@@ -52,11 +75,12 @@ export async function POST(req: Request) {
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Email error:", error);
+    await supabaseAdmin.from("otp_store").delete().eq("email", email);
     return NextResponse.json({ error: "Failed to send email" }, { status: 500 });
   }
 }
 
-// Verify token
+// Token verify
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const email = searchParams.get("email");
@@ -66,26 +90,70 @@ export async function GET(req: Request) {
     return NextResponse.json({ valid: false });
   }
 
-  const stored = resetTokenStore.get(email);
-  if (!stored) return NextResponse.json({ valid: false, error: "Token not found" });
-  if (Date.now() > stored.expires) {
-    resetTokenStore.delete(email);
+  const { data, error } = await supabaseAdmin
+    .from("otp_store")
+    .select("otp, expires_at")
+    .eq("email", email.trim().toLowerCase())
+    .single();
+
+  if (error || !data) {
+    return NextResponse.json({ valid: false, error: "Token not found" });
+  }
+
+  if (Date.now() > data.expires_at) {
+    await supabaseAdmin.from("otp_store").delete().eq("email", email);
     return NextResponse.json({ valid: false, error: "Token expired" });
   }
-  if (stored.token !== token) return NextResponse.json({ valid: false, error: "Invalid token" });
+
+  if (data.otp !== token) {
+    return NextResponse.json({ valid: false, error: "Invalid token" });
+  }
 
   return NextResponse.json({ valid: true });
 }
 
-// Reset password
+// Password reset
 export async function PATCH(req: Request) {
   const { email, token, newPassword } = await req.json();
 
-  const stored = resetTokenStore.get(email);
-  if (!stored || stored.token !== token || Date.now() > stored.expires) {
-    return NextResponse.json({ error: "Invalid or expired token" }, { status: 400 });
+  if (!email || !token || !newPassword) {
+    return NextResponse.json({ error: "All fields required" }, { status: 400 });
   }
 
-  resetTokenStore.delete(email);
+  if (newPassword.length < 6) {
+    return NextResponse.json(
+      { error: "Password must be at least 6 characters" },
+      { status: 400 }
+    );
+  }
+
+  const { data, error } = await supabaseAdmin
+    .from("otp_store")
+    .select("otp, expires_at")
+    .eq("email", email.trim().toLowerCase())
+    .single();
+
+  if (error || !data || data.otp !== token || Date.now() > data.expires_at) {
+    return NextResponse.json(
+      { error: "Invalid or expired token" },
+      { status: 400 }
+    );
+  }
+
+  // Token valid — password update karo
+  const hashed = await bcrypt.hash(newPassword, 12);
+
+  const { error: updateError } = await supabaseAdmin
+    .from("users")
+    .update({ password: hashed })
+    .eq("email", email.trim().toLowerCase());
+
+  if (updateError) {
+    return NextResponse.json({ error: "Password update failed" }, { status: 500 });
+  }
+
+  // Token delete karo — one-time use
+  await supabaseAdmin.from("otp_store").delete().eq("email", email);
+
   return NextResponse.json({ success: true });
 }

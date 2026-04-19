@@ -1,30 +1,23 @@
-import { supabaseServer } from "@/lib/supabase-server";
 import { NextRequest, NextResponse } from "next/server";
+import { supabaseAdmin } from "@/lib/supabase-server";
+import { getCurrentUser } from "@/lib/auth";
 
-// GET user progress from Supabase
 export async function GET(request: NextRequest) {
   try {
-    const userId = request.nextUrl.searchParams.get("userId");
-
-    if (!userId) {
-      return NextResponse.json(
-        { error: "userId is required" },
-        { status: 400 }
-      );
+    const user = await getCurrentUser();
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { data, error } = await supabaseServer
+    // URL se userId ignore karo — JWT se lo (spoofing prevent)
+    const { data, error } = await supabaseAdmin
       .from("user_chapter_progress")
       .select("*")
-      .eq("user_id", userId)
+      .eq("user_id", user.id)
       .maybeSingle();
 
     if (error && error.code !== "PGRST116") {
-      console.error("Supabase error fetching progress:", error);
-      return NextResponse.json(
-        { error: error.message ?? "Failed to fetch progress" },
-        { status: 500 }
-      );
+      return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
     if (!data) {
@@ -36,47 +29,36 @@ export async function GET(request: NextRequest) {
     }
 
     return NextResponse.json(data);
-  } catch (error) {
-    console.error("Error fetching progress:", error);
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to fetch progress" },
-      { status: 500 }
-    );
+  } catch (err) {
+    console.error("Error fetching progress:", err);
+    return NextResponse.json({ error: "Failed to fetch progress" }, { status: 500 });
   }
 }
 
-// POST/UPDATE user progress in Supabase
 export async function POST(request: NextRequest) {
   try {
-    const { userId, totalAttempted, totalCorrect, chapterProgress } = await request.json();
-
-    if (!userId) {
-      return NextResponse.json(
-        { error: "userId is required" },
-        { status: 400 }
-      );
+    const user = await getCurrentUser();
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Check if progress exists
-    const { data: existing, error: existingError } = await supabaseServer
+    const { totalAttempted, totalCorrect, chapterProgress } = await request.json();
+
+    // userId body se nahi — JWT se
+    const { data: existing, error: existingError } = await supabaseAdmin
       .from("user_chapter_progress")
       .select("id")
-      .eq("user_id", userId)
+      .eq("user_id", user.id)
       .maybeSingle();
 
     if (existingError) {
-      console.error("Supabase error checking existing progress:", existingError);
-      return NextResponse.json(
-        { error: existingError.message ?? "Failed to update progress" },
-        { status: 500 }
-      );
+      return NextResponse.json({ error: existingError.message }, { status: 500 });
     }
 
     let result;
 
     if (existing) {
-      // Update existing progress
-      result = await supabaseServer
+      result = await supabaseAdmin
         .from("user_chapter_progress")
         .update({
           totalAttempted,
@@ -84,14 +66,13 @@ export async function POST(request: NextRequest) {
           chapterProgress,
           updatedAt: new Date().toISOString(),
         })
-        .eq("user_id", userId)
+        .eq("user_id", user.id)
         .select();
     } else {
-      // Insert new progress
-      result = await supabaseServer
+      result = await supabaseAdmin
         .from("user_chapter_progress")
         .insert({
-          user_id: userId,
+          user_id: user.id,
           totalAttempted,
           totalCorrect,
           chapterProgress,
@@ -102,19 +83,12 @@ export async function POST(request: NextRequest) {
     }
 
     if (result.error) {
-      console.error("Supabase error writing progress:", result.error);
-      return NextResponse.json(
-        { error: result.error.message ?? "Failed to update progress" },
-        { status: 500 }
-      );
+      return NextResponse.json({ error: result.error.message }, { status: 500 });
     }
 
     return NextResponse.json(result.data?.[0]);
-  } catch (error) {
-    console.error("Error updating progress:", error);
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to update progress" },
-      { status: 500 }
-    );
+  } catch (err) {
+    console.error("Error updating progress:", err);
+    return NextResponse.json({ error: "Failed to update progress" }, { status: 500 });
   }
 }

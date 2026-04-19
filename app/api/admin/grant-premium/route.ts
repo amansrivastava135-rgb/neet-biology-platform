@@ -1,14 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
-import { PRICING, getPlanById, calculateSubscriptionEnd } from "@/lib/pricing-config";
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+import { supabaseAdmin } from "@/lib/supabase-server";
+import { getCurrentUser } from "@/lib/auth";
+import { getPlanById, calculateSubscriptionEnd } from "@/lib/pricing-config";
 
 export async function POST(req: NextRequest) {
   try {
+    // Admin auth check
+    const user = await getCurrentUser();
+    if (!user || !user.isAdmin) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
     const { email, action, planId = "premium" } = await req.json();
 
     if (!email) {
@@ -20,7 +22,7 @@ export async function POST(req: NextRequest) {
       const now = new Date();
       const expiry = calculateSubscriptionEnd(now, plan.durationDays);
 
-      const { error } = await supabase
+      const { error } = await supabaseAdmin
         .from("users")
         .update({
           is_paid: true,
@@ -31,7 +33,6 @@ export async function POST(req: NextRequest) {
         .eq("email", email);
 
       if (error) {
-        console.error("Supabase error:", error);
         return NextResponse.json({ error: "Database update failed" }, { status: 500 });
       }
 
@@ -39,9 +40,10 @@ export async function POST(req: NextRequest) {
         success: true,
         message: `${plan.id} granted (${plan.durationDays} days)`,
       });
+    }
 
-    } else if (action === "revoke") {
-      const { error } = await supabase
+    if (action === "revoke") {
+      const { error } = await supabaseAdmin
         .from("users")
         .update({
           is_paid: false,
@@ -52,7 +54,6 @@ export async function POST(req: NextRequest) {
         .eq("email", email);
 
       if (error) {
-        console.error("Supabase error:", error);
         return NextResponse.json({ error: "Database update failed" }, { status: 500 });
       }
 
@@ -60,7 +61,6 @@ export async function POST(req: NextRequest) {
     }
 
     return NextResponse.json({ error: "Invalid action" }, { status: 400 });
-
   } catch (err) {
     console.error("Grant premium error:", err);
     return NextResponse.json({ error: "Server error" }, { status: 500 });

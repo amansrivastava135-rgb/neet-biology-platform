@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Clock, FileQuestion, Lock, Play, Sparkles, Target, History } from "lucide-react";
+import { Clock, FileQuestion, Lock, Play, Sparkles, Target } from "lucide-react";
 import Link from "next/link";
 import { getRemainingDays } from "@/lib/subscription-utils";
 import { useAuth } from "@/lib/auth-context";
@@ -46,32 +46,21 @@ export function MockTestSelector({ onStartTest, isPaidUser }: MockTestSelectorPr
   return (
     <div className="container mx-auto px-4 py-8">
 
-      {/* Page Header */}
-      <div className="flex items-center justify-between mb-8">
-        <div className="text-center flex-1">
-          <h1 className="text-3xl font-bold text-foreground mb-2">NEET Mock Tests</h1>
-          <p className="text-muted-foreground">
-            Practice with full-length NEET pattern tests to build exam temperament
-          </p>
-          {isPaidUser && (
-            <div className="mt-4 flex items-center justify-center gap-2">
-              <Badge variant="secondary">Premium Active</Badge>
-              {remainingDays > 0 && (
-                <span className="text-sm text-muted-foreground">
-                  {remainingDays} days remaining
-                </span>
-              )}
-            </div>
-          )}
-        </div>
-        {/* Result History Button */}
-        {user && (
-          <Button variant="outline" asChild className="gap-2 shrink-0">
-            <Link href="/results">
-              <History className="h-4 w-4" />
-              Result History
-            </Link>
-          </Button>
+      {/* Page Header — Result History button hataya */}
+      <div className="text-center mb-8">
+        <h1 className="text-3xl font-bold text-foreground mb-2">NEET Mock Tests</h1>
+        <p className="text-muted-foreground">
+          Practice with full-length NEET pattern tests to build exam temperament
+        </p>
+        {isPaidUser && (
+          <div className="mt-4 flex items-center justify-center gap-2">
+            <Badge variant="secondary">Premium Active</Badge>
+            {remainingDays > 0 && (
+              <span className="text-sm text-muted-foreground">
+                {remainingDays} days remaining
+              </span>
+            )}
+          </div>
         )}
       </div>
 
@@ -106,7 +95,6 @@ export function MockTestSelector({ onStartTest, isPaidUser }: MockTestSelectorPr
           </Card>
         )}
 
-        {/* Info Card */}
         <Card className="border-border bg-muted/30">
           <CardHeader>
             <CardTitle className="text-xl">Mock Test Info</CardTitle>
@@ -121,7 +109,7 @@ export function MockTestSelector({ onStartTest, isPaidUser }: MockTestSelectorPr
         </Card>
       </div>
 
-      {/* Mock Tests — Premium only */}
+      {/* Mock Tests */}
       {isPaidUser ? (
         <div className="max-w-4xl mx-auto mb-10">
           <h2 className="text-xl font-bold text-foreground mb-4">
@@ -144,10 +132,7 @@ export function MockTestSelector({ onStartTest, isPaidUser }: MockTestSelectorPr
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {mockTests.map((test) => (
-                <Card
-                  key={test.id}
-                  className="border-border hover:border-primary/50 transition-colors"
-                >
+                <Card key={test.id} className="border-border hover:border-primary/50 transition-colors">
                   <CardContent className="pt-6">
                     <div className="flex items-center justify-between mb-3">
                       <span className="font-medium text-foreground">{test.name}</span>

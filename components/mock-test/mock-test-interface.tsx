@@ -51,7 +51,7 @@ export function MockTestInterface({
     async function loadQuestions() {
       setIsLoading(true);
 
-      // Specific mock test from Supabase
+      // Specific mock test from Supabase — naam wahan se lo
       if (mockTestId) {
         const { data: mockTest } = await supabase
           .from("mock_tests")
@@ -67,6 +67,7 @@ export function MockTestInterface({
 
           if (qs) {
             setQuestions(qs.map(convertToQuestion));
+            // Exact naam jo admin ne rakha hai — MOCK 1, MOCK 2 etc
             setTestLabel(mockTest.name);
           }
         }
@@ -74,7 +75,7 @@ export function MockTestInterface({
         return;
       }
 
-      // Demo test — 10 random questions
+      // Demo test
       if (testType === "preview") {
         const { data } = await supabase
           .from("questions")
@@ -90,7 +91,7 @@ export function MockTestInterface({
         return;
       }
 
-      // Full mock test — 50% Class 11 + 50% Class 12
+      // Full auto mock test
       const class11Ids = class11Chapters.map((c) => c.id);
       const class12Ids = class12Chapters.map((c) => c.id);
 
@@ -107,23 +108,17 @@ export function MockTestInterface({
       const class11Questions = class11Data || [];
       const class12Questions = class12Data || [];
 
-      // 45 from Class 11 — balanced across chapters
       const selected11: any[] = [];
       const perChapter11 = Math.ceil(45 / class11Ids.length);
       class11Ids.forEach((id) => {
-        const chapterQs = shuffleArray(
-          class11Questions.filter((q) => q.chapter_id === id)
-        );
+        const chapterQs = shuffleArray(class11Questions.filter((q) => q.chapter_id === id));
         selected11.push(...chapterQs.slice(0, perChapter11));
       });
 
-      // 45 from Class 12 — balanced across chapters
       const selected12: any[] = [];
       const perChapter12 = Math.ceil(45 / class12Ids.length);
       class12Ids.forEach((id) => {
-        const chapterQs = shuffleArray(
-          class12Questions.filter((q) => q.chapter_id === id)
-        );
+        const chapterQs = shuffleArray(class12Questions.filter((q) => q.chapter_id === id));
         selected12.push(...chapterQs.slice(0, perChapter12));
       });
 
@@ -132,11 +127,7 @@ export function MockTestInterface({
       const finalQuestions = shuffleArray([...final11, ...final12]);
 
       setQuestions(finalQuestions.map(convertToQuestion));
-      setTestLabel(
-        autoTestIndex !== undefined
-          ? `Mock Test ${autoTestIndex + 1}`
-          : "Full Mock Test — 90 Questions (50% Class 11 + 50% Class 12)"
-      );
+      setTestLabel("Full Mock Test");
       setIsLoading(false);
     }
 
@@ -165,7 +156,7 @@ export function MockTestInterface({
         <div className="text-center">
           <p className="text-muted-foreground text-lg mb-4">No questions available.</p>
           <p className="text-sm text-muted-foreground">
-            Admin se request karo questions add karne ke liye!
+            Please ask admin to add questions.
           </p>
         </div>
       </div>
@@ -180,7 +171,7 @@ export function MockTestInterface({
       onSubmit={onSubmit}
       isPaidUser={isPaidUser}
       testLabel={testLabel}
-      initialTestType={testType}
+      initialTestType={testType === "full" ? "full" : "preview"}
     />
   );
 }

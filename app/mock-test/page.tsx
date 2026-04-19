@@ -9,6 +9,7 @@ import { MockTestInterface } from "@/components/mock-test/mock-test-interface";
 import { MockTestResult } from "@/components/mock-test/mock-test-result";
 import { ErrorBoundary } from "@/components/error-boundary";
 import { type Question } from "@/lib/data";
+import { supabase } from "@/lib/supabase";
 
 export type MockTestState = "selection" | "test" | "result";
 export type MockTestAnswer = string | null;
@@ -17,6 +18,7 @@ type MockTestResultData = {
   questions: Question[];
   answers: MockTestAnswer[];
   timeTaken: number;
+  testLabel: string; // actual naam pass karo
 };
 
 function MockTestContentWrapper({ onTestStateChange }: { onTestStateChange: (inTest: boolean) => void }) {
@@ -29,11 +31,16 @@ function MockTestContentWrapper({ onTestStateChange }: { onTestStateChange: (inT
   const [resultData, setResultData] = useState<MockTestResultData | null>(null);
   const [testLabel, setTestLabel] = useState("Demo Test");
 
-  const handleStartTest = (type: "full" | "preview", manualTestId?: string, autoIndex?: number) => {
+  const handleStartTest = async (
+    type: "full" | "preview",
+    manualTestId?: string,
+    autoIndex?: number
+  ) => {
     if (type === "full" && !isPaid) {
       window.location.href = "/pricing";
       return;
     }
+
     setTestType(type);
     setMockTestId(manualTestId);
     setAutoTestIndex(autoIndex);
@@ -41,17 +48,23 @@ function MockTestContentWrapper({ onTestStateChange }: { onTestStateChange: (inT
     setTestState("test");
     onTestStateChange(true);
 
+    // Actual mock test naam Supabase se fetch karo
     if (manualTestId) {
-      setTestLabel("Custom Mock Test");
-    } else if (autoIndex !== undefined) {
-      setTestLabel(`Mock Test ${autoIndex + 1}`);
-    } else {
+      const { data: mockTest } = await supabase
+        .from("mock_tests")
+        .select("name")
+        .eq("id", manualTestId)
+        .single();
+      setTestLabel(mockTest?.name || "Mock Test");
+    } else if (type === "preview") {
       setTestLabel("Demo Test");
+    } else {
+      setTestLabel("Full Mock Test");
     }
   };
 
-  const handleSubmitTest = (data: MockTestResultData) => {
-    setResultData(data);
+  const handleSubmitTest = (data: { questions: Question[]; answers: MockTestAnswer[]; timeTaken: number }) => {
+    setResultData({ ...data, testLabel });
     setTestState("result");
     onTestStateChange(false);
   };
@@ -96,7 +109,7 @@ function MockTestContentWrapper({ onTestStateChange }: { onTestStateChange: (inT
           answers={resultData.answers}
           timeTaken={resultData.timeTaken}
           testType={testType}
-          testLabel={testLabel}
+          testLabel={resultData.testLabel}
           onRetake={handleRetakeTest}
         />
       )}

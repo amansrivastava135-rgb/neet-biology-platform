@@ -17,8 +17,11 @@ export async function POST(req: NextRequest) {
       razorpay_signature,
       email,
       planId = "premium",
+      promoCode = null,
+      discountAmount = 0,
     } = body;
 
+    // Verify payment signature
     const valid = verifySignature({ razorpay_order_id, razorpay_payment_id, razorpay_signature });
     if (!valid) {
       return NextResponse.json({ success: false, message: "Invalid signature" }, { status: 400 });
@@ -28,6 +31,7 @@ export async function POST(req: NextRequest) {
     const now = new Date();
     const subscriptionEnd = calculateSubscriptionEnd(now, plan.durationDays);
 
+    // Update user subscription in database
     if (email) {
       const { error } = await supabase
         .from("users")
@@ -40,6 +44,22 @@ export async function POST(req: NextRequest) {
         .eq("email", email);
 
       if (error) console.error("Supabase update error:", error);
+
+      // Record promo code usage
+      if (promoCode) {
+        const upperCode = promoCode.toUpperCase().trim();
+
+        // Increment usage count
+        await supabase.rpc("increment_promo_usage", { promo_code: upperCode });
+
+        // Log usage
+        await supabase.from("promo_code_uses").insert({
+          code: upperCode,
+          user_email: email,
+          plan_id: plan.id,
+          discount_applied: discountAmount,
+        });
+      }
     }
 
     const userUpdate = {

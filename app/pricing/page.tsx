@@ -8,7 +8,8 @@ import { isPremium } from "@/lib/checkPremium";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Shield, Zap, BookOpen, FileText, BarChart3, Clock } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Shield, Zap, BookOpen, FileText, BarChart3, Clock, Tag, CheckCircle, XCircle } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { PRICING } from "@/lib/pricing-config";
@@ -25,12 +26,115 @@ const allFeatures = [
   { name: "Weak Chapter Analysis", free: false, paid: true },
 ];
 
+type PromoResult = {
+  code: string;
+  discountAmount: number;
+  finalPrice: number;
+  originalPrice: number;
+  message: string;
+  planId: string; // which plan was validated
+};
+
+type PromoState = {
+  code: string;
+  status: "idle" | "loading" | "valid" | "invalid";
+  message: string;
+  // Store results per plan so all cards can show correct price
+  results: Record<string, PromoResult>;
+};
+
 function PricingContent() {
   const { user, activateSubscription, updateUser } = useAuth();
   const isPaid = isPremium(user);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [activePlanId, setActivePlanId] = useState<string | null>(null);
   const router = useRouter();
+
+  const [promo, setPromo] = useState<PromoState>({
+    code: "",
+    status: "idle",
+    message: "",
+    results: {},
+  });
+
+  // Validate promo for ALL paid plans at once
+  const validatePromo = async () => {
+    if (!promo.code.trim()) return;
+    setPromo((p) => ({ ...p, status: "loading", message: "" }));
+
+    const paidPlans = ["crash", "sixMonth", "premium"];
+    const results: Record<string, PromoResult> = {};
+    let anyValid = false;
+    let lastMessage = "This code is not applicable for any plan";
+
+    // Validate against each plan
+    await Promise.all(
+      paidPlans.map(async (planId) => {
+        try {
+          const res = await fetch("/api/payment/validate-promo", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              code: promo.code,
+              planId,
+              email: user?.email,
+            }),
+          }).then((r) => r.json());
+
+          if (res.valid) {
+            anyValid = true;
+            results[planId] = {
+              code: promo.code,
+              discountAmount: res.discountAmount,
+              finalPrice: res.finalPrice,
+              originalPrice: res.originalPrice,
+              message: res.message,
+              planId,
+            };
+            lastMessage = res.message;
+          }
+        } catch {
+          // ignore individual plan errors
+        }
+      })
+    );
+
+    if (anyValid) {
+      setPromo((p) => ({
+        ...p,
+        status: "valid",
+        message: lastMessage,
+        results,
+      }));
+    } else {
+      // Get actual error from one plan
+      try {
+        const res = await fetch("/api/payment/validate-promo", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            code: promo.code,
+            planId: "premium",
+            email: user?.email,
+          }),
+        }).then((r) => r.json());
+        setPromo((p) => ({
+          ...p,
+          status: "invalid",
+          message: res.message || "Invalid promo code",
+          results: {},
+        }));
+      } catch {
+        setPromo((p) => ({
+          ...p,
+          status: "invalid",
+          message: "Invalid promo code",
+          results: {},
+        }));
+      }
+    }
+  };
 
   const loadRazorpay = () => {
     return new Promise<void>((resolve, reject) => {
@@ -48,6 +152,7 @@ function PricingContent() {
     if (!user) { router.push("/login"); return; }
     setError(null);
     setLoading(true);
+    setActivePlanId(planId);
 
     try {
       if (!process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID) {
@@ -58,10 +163,16 @@ function PricingContent() {
 
       await loadRazorpay();
 
+      // Get promo result for this specific plan
+      const promoResult = promo.status === "valid" ? promo.results[planId] : null;
+
       const orderRes = await fetch("/api/payment/create-order", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ planId }),
+        body: JSON.stringify({
+          planId,
+          promoCode: promoResult ? promo.code : null,
+        }),
       }).then((r) => r.json());
 
       const planData = PRICING[planId as keyof typeof PRICING];
@@ -83,6 +194,8 @@ function PricingContent() {
               razorpay_signature: response.razorpay_signature,
               email: user.email,
               planId,
+              promoCode: promoResult ? promo.code : null,
+              discountAmount: promoResult?.discountAmount || 0,
             }),
           }).then((r) => r.json());
 
@@ -107,7 +220,14 @@ function PricingContent() {
       setError("Unable to initiate payment. Please try again later.");
     } finally {
       setLoading(false);
+      setActivePlanId(null);
     }
+  };
+
+  // Helper — get promo display for a specific plan
+  const getPromoForPlan = (planId: string) => {
+    if (promo.status !== "valid") return undefined;
+    return promo.results[planId];
   };
 
   return (
@@ -115,7 +235,8 @@ function PricingContent() {
       <Header />
       <main className="flex-1">
         <div className="container mx-auto px-4 py-12">
-          {/* Header */}
+
+          {/* Page Header */}
           <div className="text-center mb-12">
             <Badge variant="secondary" className="mb-4">Pricing</Badge>
             <h1 className="text-4xl font-bold text-foreground mb-4">
@@ -127,14 +248,68 @@ function PricingContent() {
             </p>
           </div>
 
-          {/* Error */}
+          {/* Error Message */}
           {error && (
             <div className="max-w-4xl mx-auto mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
               {error}
             </div>
           )}
 
-          {/* CRASH PACK — TOP FULL WIDTH */}
+          {/* Promo Code Section */}
+          {!isPaid && (
+            <div className="max-w-4xl mx-auto mb-8">
+              <Card className="border-border">
+                <CardContent className="py-4">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+                    <div className="flex items-center gap-2 text-sm font-medium text-foreground whitespace-nowrap">
+                      <Tag className="h-4 w-4 text-primary" />
+                      Promo Code
+                    </div>
+                    <div className="flex flex-1 gap-2 w-full">
+                      <Input
+                        placeholder="Enter promo code (e.g. NEET2025)"
+                        value={promo.code}
+                        onChange={(e) =>
+                          setPromo((p) => ({
+                            ...p,
+                            code: e.target.value.toUpperCase(),
+                            status: "idle",
+                            message: "",
+                            results: {},
+                          }))
+                        }
+                        className="uppercase"
+                        onKeyDown={(e) => e.key === "Enter" && validatePromo()}
+                      />
+                      <Button
+                        variant="outline"
+                        onClick={validatePromo}
+                        disabled={!promo.code.trim() || promo.status === "loading"}
+                      >
+                        {promo.status === "loading" ? "Checking..." : "Apply"}
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* Promo Status */}
+                  {promo.status === "valid" && (
+                    <div className="mt-3 flex items-center gap-2 text-sm text-green-600">
+                      <CheckCircle className="h-4 w-4" />
+                      {promo.message} — Discount applied on eligible plans below
+                    </div>
+                  )}
+                  {promo.status === "invalid" && (
+                    <div className="mt-3 flex items-center gap-2 text-sm text-red-600">
+                      <XCircle className="h-4 w-4" />
+                      {promo.message}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
+          {/* Crash Pack */}
           {!isPaid && (
             <div className="max-w-4xl mx-auto mb-8">
               <Card className="border-orange-400 bg-orange-50 dark:bg-orange-950/20 relative">
@@ -157,13 +332,27 @@ function PricingContent() {
                       <li>✅ Performance Analytics</li>
                     </ul>
                     <div className="text-center min-w-[140px]">
-                      <div className="text-4xl font-bold text-foreground mb-2">₹299</div>
+                      {getPromoForPlan("crash") ? (
+                        <div className="mb-2">
+                          <span className="text-2xl line-through text-muted-foreground">
+                            ₹{PRICING.crash.price}
+                          </span>
+                          <span className="text-4xl font-bold text-foreground ml-2">
+                            ₹{getPromoForPlan("crash")!.finalPrice}
+                          </span>
+                          <p className="text-xs text-green-600 mt-1">
+                            {getPromoForPlan("crash")!.message}
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="text-4xl font-bold text-foreground mb-2">₹299</div>
+                      )}
                       <Button
                         className="bg-orange-500 hover:bg-orange-600 text-white border-0 w-full"
                         onClick={() => handleBuy("crash")}
-                        disabled={loading}
+                        disabled={loading && activePlanId === "crash"}
                       >
-                        Buy Crash Pack
+                        {loading && activePlanId === "crash" ? "Processing..." : "Buy Crash Pack"}
                       </Button>
                     </div>
                   </div>
@@ -172,7 +361,7 @@ function PricingContent() {
             </div>
           )}
 
-          {/* FREE + PREMIUM PLANS */}
+          {/* Free + Yearly Plans */}
           <div className={`max-w-4xl mx-auto mb-8 ${isPaid ? "" : "grid grid-cols-1 md:grid-cols-2 gap-8"}`}>
             {!isPaid && (
               <PricingCard
@@ -188,10 +377,11 @@ function PricingContent() {
               userIsPaid={isPaid}
               userLoggedIn={!!user}
               onBuy={handleBuy}
+              promoResult={getPromoForPlan("premium")}
             />
           </div>
 
-          {/* 6 MONTH PLAN */}
+          {/* 6 Month Plan */}
           {!isPaid && (
             <div className="max-w-sm mx-auto mb-16">
               <PricingCard
@@ -200,6 +390,7 @@ function PricingContent() {
                 userIsPaid={isPaid}
                 userLoggedIn={!!user}
                 onBuy={handleBuy}
+                promoResult={getPromoForPlan("sixMonth")}
               />
             </div>
           )}
@@ -229,8 +420,10 @@ function PricingContent() {
               <Card className="border-border"><CardContent className="pt-6"><h3 className="font-semibold text-foreground mb-2">Is the content based on NCERT?</h3><p className="text-sm text-muted-foreground">Yes, all questions and explanations are strictly based on NCERT Biology textbooks and NEET exam patterns.</p></CardContent></Card>
               <Card className="border-border"><CardContent className="pt-6"><h3 className="font-semibold text-foreground mb-2">What payment methods are accepted?</h3><p className="text-sm text-muted-foreground">We accept UPI, debit cards, credit cards, and net banking through our secure payment gateway.</p></CardContent></Card>
               <Card className="border-border"><CardContent className="pt-6"><h3 className="font-semibold text-foreground mb-2">What is the Crash Pack?</h3><p className="text-sm text-muted-foreground">The Crash Pack gives you 30 days of full access to all features — perfect for last-minute NEET preparation at just ₹299.</p></CardContent></Card>
+              <Card className="border-border"><CardContent className="pt-6"><h3 className="font-semibold text-foreground mb-2">Do you have promo codes?</h3><p className="text-sm text-muted-foreground">Yes! Follow our social media or ask your coaching partner for exclusive promo codes and get instant discounts.</p></CardContent></Card>
             </div>
           </div>
+
         </div>
       </main>
       <Footer />

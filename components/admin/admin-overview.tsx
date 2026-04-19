@@ -12,18 +12,33 @@ export function AdminOverview() {
   const [students, setStudents] = useState<any[]>([]);
   const [totalQuestions, setTotalQuestions] = useState(0);
   const [premiumCount, setPremiumCount] = useState(0);
+  const [estimatedRevenue, setEstimatedRevenue] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
   const fetchData = useCallback(async () => {
     setIsLoading(true);
+
     const { data: usersData } = await supabase
       .from("users")
-      .select("id, name, email, is_paid, subscription_end");
+      .select("id, name, email, is_paid, subscription_end, subscription_plan");
 
     if (usersData) {
       setStudents(usersData);
       setPremiumCount(usersData.filter((u) => u.is_paid).length);
+
+      // Revenue based on actual plan
+      const planPrices: Record<string, number> = {
+        crash: 299,
+        sixMonth: 599,
+        premium: 999,
+      };
+      const rev = usersData
+        .filter((u) => u.is_paid)
+        .reduce((sum: number, u: any) => {
+          return sum + (planPrices[u.subscription_plan] || 999);
+        }, 0);
+      setEstimatedRevenue(rev);
     }
 
     const { count } = await supabase
@@ -39,11 +54,7 @@ export function AdminOverview() {
     fetchData();
   }, [fetchData]);
 
-  // Realtime HATAYA — CSP block kar rahi thi, phone crash ho raha tha
-  // Manual refresh button se kaam chalega
-
   const totalChapters = class11Chapters.length + class12Chapters.length;
-  const revenue = premiumCount * 499;
 
   const stats = [
     {
@@ -69,7 +80,7 @@ export function AdminOverview() {
     },
     {
       title: "Est. Revenue",
-      value: isLoading ? "..." : `₹${revenue.toLocaleString()}`,
+      value: isLoading ? "..." : `₹${estimatedRevenue.toLocaleString()}`,
       icon: IndianRupee,
       color: "text-amber-500",
       bgColor: "bg-amber-500/10",
@@ -80,7 +91,7 @@ export function AdminOverview() {
 
   return (
     <div className="space-y-6">
-      {/* Refresh button */}
+      {/* Refresh */}
       <div className="flex items-center justify-end gap-2">
         <Button
           variant="outline"
@@ -119,7 +130,7 @@ export function AdminOverview() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Students Chart */}
+        {/* Chart */}
         <Card className="border-border">
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
@@ -133,7 +144,9 @@ export function AdminOverview() {
                 <BarChart
                   data={[
                     { label: "Free", count: students.length - premiumCount },
-                    { label: "Premium", count: premiumCount },
+                    { label: "Crash", count: students.filter((s) => s.subscription_plan === "crash").length },
+                    { label: "6 Month", count: students.filter((s) => s.subscription_plan === "sixMonth").length },
+                    { label: "Yearly", count: students.filter((s) => s.subscription_plan === "premium").length },
                   ]}
                 >
                   <CartesianGrid strokeDasharray="3 3" />
@@ -144,12 +157,8 @@ export function AdminOverview() {
                       if (active && payload && payload.length) {
                         return (
                           <div className="bg-card border border-border rounded-lg p-3 shadow-lg">
-                            <p className="font-medium text-foreground">
-                              {payload[0].payload.label}
-                            </p>
-                            <p className="text-sm text-muted-foreground">
-                              Students: {payload[0].value}
-                            </p>
+                            <p className="font-medium text-foreground">{payload[0].payload.label}</p>
+                            <p className="text-sm text-muted-foreground">Students: {payload[0].value}</p>
                           </div>
                         );
                       }
@@ -163,7 +172,7 @@ export function AdminOverview() {
           </CardContent>
         </Card>
 
-        {/* Recent Premium Students */}
+        {/* Recent Premium */}
         <Card className="border-border">
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
@@ -185,7 +194,13 @@ export function AdminOverview() {
                       <p className="text-sm text-muted-foreground">{student.email}</p>
                     </div>
                     <div className="text-right">
-                      <p className="text-sm font-medium text-green-500">Premium</p>
+                      <p className="text-sm font-medium text-green-500">
+                        {student.subscription_plan === "crash"
+                          ? "Crash Pack"
+                          : student.subscription_plan === "sixMonth"
+                          ? "6 Month"
+                          : "Yearly"}
+                      </p>
                       <p className="text-xs text-muted-foreground">
                         {student.subscription_end
                           ? `Expires: ${new Date(student.subscription_end).toLocaleDateString()}`

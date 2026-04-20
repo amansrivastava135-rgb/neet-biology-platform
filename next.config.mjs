@@ -39,14 +39,7 @@ const nextConfig = {
         source: '/(.*)',
         headers: securityHeaders,
       },
-      {
-        source: '/api/:path*',
-        headers: [
-          { key: 'Access-Control-Allow-Origin', value: '*' },
-          { key: 'Access-Control-Allow-Methods', value: 'GET, POST, PUT, DELETE, OPTIONS' },
-          { key: 'Access-Control-Allow-Headers', value: 'Content-Type, Authorization' },
-        ],
-      },
+      // ❌ Access-Control-Allow-Origin: * hata diya — cookies block hoti thi
     ];
   },
 };
@@ -57,12 +50,13 @@ export default withPWA({
   skipWaiting: true,
   disable: process.env.NODE_ENV === "development",
   runtimeCaching: [
+    // ❌ CacheFirst hata diya — API responses cache nahi honge
+    // Questions 0 dikhne ka root cause yahi tha
     {
-      urlPattern: /\/api\/questions/,
-      handler: "CacheFirst",
+      urlPattern: /^https?.*/,
+      handler: "NetworkOnly",
       options: {
-        cacheName: "questions-cache",
-        expiration: { maxEntries: 100, maxAgeSeconds: 7 * 24 * 60 * 60 },
+        cacheName: "default",
       },
     },
   ],

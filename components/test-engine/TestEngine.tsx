@@ -127,7 +127,7 @@ export function TestEngine({
 
   const hasTimer = totalTime > 0;
   const [timeLeft, setTimeLeft] = useState(() => {
-    if (!hasTimer) return 0;
+    if (!hasTimer) return totalTime;
     if (typeof savedState?.timeLeft === "number") {
       return Math.min(Math.max(0, savedState.timeLeft), totalTime);
     }
@@ -185,12 +185,15 @@ export function TestEngine({
   useEffect(() => {
     persistTestState();
   }, [answers, currentIndex, visitedQuestions, markedForReview, bookmarked, timeLeft]);
-
+  
+  const timeLeftRef = useRef(timeLeft);
+  useEffect(() => { timeLeftRef.current = timeLeft; }, [timeLeft]);
+  
   const submitTest = useCallback((autoSubmit = false) => {
     if (hasSubmitted) return;
     setHasSubmitted(true);
     if (timerRef.current) clearInterval(timerRef.current);
-    const timeTaken = hasTimer ? totalTime - timeLeft : 0;
+    const timeTaken = hasTimer ? totalTime - timeLeftRef.current : 0;
     clearStoredTest();
     saveProgressToStorage(questionsRef.current, answersRef.current);
     onSubmit({
@@ -211,6 +214,7 @@ export function TestEngine({
   }, [hasSubmitted, totalTime]);
 
   useEffect(() => {
+    if (!hasTimer) return;
     if (timeLeft > 0 || hasSubmitted) return;
     submitTest(true);
   }, [timeLeft, hasSubmitted, submitTest]);

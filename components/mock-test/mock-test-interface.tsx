@@ -136,8 +136,8 @@ export function MockTestInterface({
 
   const totalTime = testType === "full" ? 90 * 60 : 10 * 60;
   const storageKey = mockTestId
-    ? `neet-mock-${mockTestId}`
-    : `neet-mock-${testType}-${autoTestIndex ?? 0}`;
+  ? `neet-mock-${mockTestId}-${Date.now()}`
+  : `neet-mock-${testType}-${Date.now()}`;
 
   if (isLoading) {
     return (

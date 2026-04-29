@@ -10,7 +10,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Menu, X, LogOut, LayoutDashboard, BookOpen, FileText, Settings, History } from "lucide-react";
+import { X, LogOut, LayoutDashboard, BookOpen, FileText, Settings, History, User } from "lucide-react";
 import { useState } from "react";
 
 export function Header() {
@@ -69,7 +69,6 @@ export function Header() {
           {user ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                {/* Avatar button — same shape as left logo */}
                 <button className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-primary-foreground text-sm font-bold hover:bg-primary/90 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary">
                   {userInitial}
                 </button>
@@ -136,25 +135,20 @@ export function Header() {
           )}
         </div>
 
-        {/* Mobile Menu Button */}
-        <div className="md:hidden flex items-center gap-2">
-          {/* Mobile avatar — sirf logged in user ke liye */}
-          {user && (
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground text-sm font-bold">
-              {userInitial}
-            </div>
-          )}
-          <Button
-            variant="ghost"
-            size="icon"
+        {/* Mobile — single avatar/menu button */}
+        <div className="md:hidden">
+          <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors focus:outline-none"
           >
             {mobileMenuOpen ? (
               <X className="h-5 w-5" />
+            ) : userInitial ? (
+              <span className="text-sm font-bold">{userInitial}</span>
             ) : (
-              <Menu className="h-5 w-5" />
+              <User className="h-5 w-5" />
             )}
-          </Button>
+          </button>
         </div>
       </div>
 
@@ -162,7 +156,8 @@ export function Header() {
       {mobileMenuOpen && (
         <div className="md:hidden border-t border-border bg-card">
           <nav className="container mx-auto px-4 py-4 flex flex-col gap-2">
-            {/* User info mobile */}
+
+            {/* User info */}
             {user && (
               <div className="px-4 py-3 bg-muted/50 rounded-lg mb-2 flex items-center gap-3">
                 <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-primary-foreground text-sm font-bold flex-shrink-0">

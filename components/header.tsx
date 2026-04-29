@@ -10,39 +10,55 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Menu, X, User, LogOut, LayoutDashboard, BookOpen, FileText, Settings, History } from "lucide-react";
+import { Menu, X, LogOut, LayoutDashboard, BookOpen, FileText, Settings, History } from "lucide-react";
 import { useState } from "react";
 
 export function Header() {
   const { user, logout } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
+  const userInitial = user?.name?.charAt(0).toUpperCase() ?? null;
+
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/80">
       <div className="container mx-auto flex h-16 items-center justify-between px-4">
+
+        {/* Left — Logo */}
         <Link href="/" className="flex items-center gap-2">
           <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary">
             <BookOpen className="h-6 w-6 text-primary-foreground" />
           </div>
           <div className="hidden sm:block">
-  <p className="text-sm font-bold text-foreground leading-tight">Master360</p>
-  <p className="text-xs text-muted-foreground">Dr. Amankumar Srivastav</p>
-</div>
+            <p className="text-sm font-bold text-foreground leading-tight">Master360</p>
+            <p className="text-xs text-muted-foreground">Dr. Amankumar Srivastav</p>
+          </div>
         </Link>
 
         {/* Desktop Navigation */}
         <nav className="hidden md:flex items-center gap-6">
-          <Link href="/practice" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
+          <Link
+            href="/practice"
+            className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+          >
             Practice
           </Link>
-          <Link href="/mock-test" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
+          <Link
+            href="/mock-test"
+            className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+          >
             Mock Tests
           </Link>
-          <Link href="/pricing" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
+          <Link
+            href="/pricing"
+            className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+          >
             Pricing
           </Link>
           {user?.isAdmin && (
-            <Link href="/admin" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
+            <Link
+              href="/admin"
+              className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+            >
               Admin
             </Link>
           )}
@@ -53,12 +69,16 @@ export function Header() {
           {user ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" className="gap-2">
-                  <User className="h-4 w-4" />
-                  {user.name}
-                </Button>
+                {/* Avatar button — same shape as left logo */}
+                <button className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-primary-foreground text-sm font-bold hover:bg-primary/90 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary">
+                  {userInitial}
+                </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-48">
+                <div className="px-3 py-2 border-b border-border mb-1">
+                  <p className="text-sm font-medium text-foreground truncate">{user.name}</p>
+                  <p className="text-xs text-muted-foreground truncate">{user.email}</p>
+                </div>
                 <DropdownMenuItem asChild>
                   <Link href="/dashboard" className="flex items-center gap-2 cursor-pointer">
                     <LayoutDashboard className="h-4 w-4" />
@@ -77,7 +97,6 @@ export function Header() {
                     Mock Tests
                   </Link>
                 </DropdownMenuItem>
-                {/* Result History — yahan add kiya */}
                 <DropdownMenuItem asChild>
                   <Link href="/results" className="flex items-center gap-2 cursor-pointer">
                     <History className="h-4 w-4" />
@@ -118,20 +137,44 @@ export function Header() {
         </div>
 
         {/* Mobile Menu Button */}
-        <Button
-          variant="ghost"
-          size="icon"
-          className="md:hidden"
-          onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-        >
-          {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-        </Button>
+        <div className="md:hidden flex items-center gap-2">
+          {/* Mobile avatar — sirf logged in user ke liye */}
+          {user && (
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground text-sm font-bold">
+              {userInitial}
+            </div>
+          )}
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+          >
+            {mobileMenuOpen ? (
+              <X className="h-5 w-5" />
+            ) : (
+              <Menu className="h-5 w-5" />
+            )}
+          </Button>
+        </div>
       </div>
 
       {/* Mobile Menu */}
       {mobileMenuOpen && (
         <div className="md:hidden border-t border-border bg-card">
           <nav className="container mx-auto px-4 py-4 flex flex-col gap-2">
+            {/* User info mobile */}
+            {user && (
+              <div className="px-4 py-3 bg-muted/50 rounded-lg mb-2 flex items-center gap-3">
+                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-primary-foreground text-sm font-bold flex-shrink-0">
+                  {userInitial}
+                </div>
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-foreground truncate">{user.name}</p>
+                  <p className="text-xs text-muted-foreground truncate">{user.email}</p>
+                </div>
+              </div>
+            )}
+
             <Link
               href="/practice"
               className="px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors"
@@ -162,7 +205,9 @@ export function Header() {
                 Admin
               </Link>
             )}
+
             <div className="border-t border-border my-2" />
+
             {user ? (
               <>
                 <Link
@@ -172,7 +217,6 @@ export function Header() {
                 >
                   Dashboard
                 </Link>
-                {/* Result History mobile mein bhi */}
                 <Link
                   href="/results"
                   className="px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors"

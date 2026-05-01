@@ -1,13 +1,7 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-server";
-import { getCurrentUser } from "@/lib/auth";
 
 export async function GET(req: Request) {
-  const user = await getCurrentUser();
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
   const { searchParams } = new URL(req.url);
   const chapterId = searchParams.get("chapterId");
 
@@ -15,7 +9,6 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "chapterId required" }, { status: 400 });
   }
 
-  // Sirf count — poore questions nahi, bahut fast
   const { count, error } = await supabaseAdmin
     .from("questions")
     .select("*", { count: "exact", head: true })

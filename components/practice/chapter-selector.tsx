@@ -27,7 +27,9 @@ type SetInfo = {
 
 async function getSetsForChapter(chapterId: number): Promise<SetInfo[]> {
   try {
-    const res = await fetch(`/api/questions?chapterId=${chapterId}`);
+    const res = await fetch(`/api/questions?chapterId=${chapterId}`, {
+      credentials: "include", // ← cookie attach hogi
+    });
     if (!res.ok) return [];
     const data = await res.json();
     const sets = (data.sets || []).filter((s: SetInfo) => s.label !== "PYQ Set");
@@ -39,7 +41,9 @@ async function getSetsForChapter(chapterId: number): Promise<SetInfo[]> {
 
 async function getChapterQuestionCount(chapterId: number): Promise<number> {
   try {
-    const res = await fetch(`/api/questions/count?chapterId=${chapterId}`);
+    const res = await fetch(`/api/questions/count?chapterId=${chapterId}`, {
+      credentials: "include", // ← cookie attach hogi
+    });
     if (!res.ok) return 0;
     const data = await res.json();
     return data.count || 0;
@@ -50,7 +54,9 @@ async function getChapterQuestionCount(chapterId: number): Promise<number> {
 
 async function fetchPYQData() {
   try {
-    const res = await fetch(`/api/questions?source=PYQ`);
+    const res = await fetch(`/api/questions?source=PYQ`, {
+      credentials: "include", // ← cookie attach hogi
+    });
     if (!res.ok) return [];
     const data = await res.json();
     return data.questions || [];

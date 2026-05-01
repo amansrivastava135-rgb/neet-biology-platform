@@ -59,7 +59,8 @@ function PracticeContent() {
       try {
         if (mode.type === "chapter") {
           const res = await fetch(
-            `/api/questions?chapterId=${mode.chapterId}&setNumber=${mode.setNumber}`
+            `/api/questions?chapterId=${mode.chapterId}&setNumber=${mode.setNumber}`,
+            { credentials: "include" }
           );
           const data = await res.json();
           const converted: Question[] = (data.questions || []).map((q: any) => ({
@@ -85,7 +86,10 @@ function PracticeContent() {
         }
 
         if (mode.type === "pyq-year") {
-          const res = await fetch(`/api/questions?source=PYQ&year=${mode.year}`);
+          const res = await fetch(
+            `/api/questions?source=PYQ&year=${mode.year}`,
+            { credentials: "include" }
+          );
           const data = await res.json();
           const converted: Question[] = (data.questions || []).map((q: any) => ({
             id: q.id,
@@ -105,7 +109,10 @@ function PracticeContent() {
         }
 
         if (mode.type === "pyq-chapter") {
-          const res = await fetch(`/api/questions?chapterId=${mode.chapterId}&source=PYQ`);
+          const res = await fetch(
+            `/api/questions?chapterId=${mode.chapterId}&source=PYQ`,
+            { credentials: "include" }
+          );
           const data = await res.json();
           const converted: Question[] = (data.questions || []).map((q: any) => ({
             id: q.id,

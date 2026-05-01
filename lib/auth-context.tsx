@@ -13,7 +13,7 @@ export type User = {
   email: string;
   name: string;
   isPaid: boolean;
-  subscriptionPlan?: "free" | "crash" | "sixMonth" | "premium" | "expired";
+  subscriptionPlan?: "free" | "monthly" | "sixMonth" | "premium" | "trial" | "expired";
   subscriptionStart?: string;
   subscriptionEnd?: string;
   subscription?: "free" | "active" | "expired";

@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { class11Chapters, class12Chapters } from "@/lib/data";
 import { BookOpen, Lock, Play, Sparkles, ChevronRight, X, Calendar, Loader2 } from "lucide-react";
+import { TRIAL_MAX_CHAPTERS } from "@/lib/pricing-config";
 
 type ChapterSelectorProps = {
   onSelectChapter: (chapterId: number, setNumber?: number) => void;
@@ -14,6 +15,7 @@ type ChapterSelectorProps = {
   onStartPYQYear: (year: number) => void;
   onStartPYQChapter: (chapterId: number) => void;
   isPaidUser: boolean;
+  isTrial?: boolean;
 };
 
 type SetInfo = {
@@ -256,11 +258,13 @@ function ChapterCard({
   chapter,
   index,
   isUnlocked,
+  isTrial,
   onClick,
 }: {
   chapter: { id: number; name: string; questionCount: number };
   index: number;
   isUnlocked: boolean;
+  isTrial?: boolean;
   onClick: () => void;
 }) {
   const [questionCount, setQuestionCount] = useState<number | null>(null);
@@ -312,7 +316,7 @@ function ChapterCard({
         >
           {isUnlocked ? (
             <><Play className="h-4 w-4 mr-2" />Select Set</>
-          ) : "Unlock Premium"}
+          ) : isTrial ? "Upgrade to Unlock" : "Unlock Premium"}
         </Button>
       </CardContent>
     </Card>
@@ -325,11 +329,16 @@ export function ChapterSelector({
   onStartPYQYear,
   onStartPYQChapter,
   isPaidUser,
+  isTrial = false,
 }: ChapterSelectorProps) {
   const [activeTab, setActiveTab] = useState<"11" | "12" | "pyq">("11");
   const [selectedChapter, setSelectedChapter] = useState<{ id: number; name: string } | null>(null);
   const [sets, setSets] = useState<SetInfo[]>([]);
   const [setsLoading, setSetsLoading] = useState(false);
+
+  // Trial: Class 11 se pehle 3, Class 12 se pehle 2 = total 5
+  const TRIAL_CLASS11_LIMIT = 3;
+  const TRIAL_CLASS12_LIMIT = 2;
 
   const handleChapterClick = async (chapter: { id: number; name: string }) => {
     setSelectedChapter(chapter);
@@ -347,6 +356,13 @@ export function ChapterSelector({
     }
   };
 
+  const getChapterUnlocked = (classType: "11" | "12", index: number): boolean => {
+    if (isTrial) {
+      return classType === "11" ? index < TRIAL_CLASS11_LIMIT : index < TRIAL_CLASS12_LIMIT;
+    }
+    return isPaidUser || index < 2;
+  };
+
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="text-center mb-8">
@@ -356,7 +372,24 @@ export function ChapterSelector({
         </p>
       </div>
 
-      {!isPaidUser && (
+      {/* Trial Banner */}
+      {isTrial && (
+        <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-lg flex items-center justify-between gap-4">
+          <div>
+            <p className="text-sm font-semibold text-amber-900">
+              Trial Access: {TRIAL_MAX_CHAPTERS} chapters unlocked
+            </p>
+            <p className="text-xs text-amber-700 mt-0.5">
+              Upgrade to Premium to unlock all 38 chapters
+            </p>
+          </div>
+          <Button size="sm" asChild className="shrink-0">
+            <a href="/pricing">Upgrade</a>
+          </Button>
+        </div>
+      )}
+
+      {!isPaidUser && !isTrial && (
         <Card className="mb-8 border-primary/50 bg-primary/5">
           <CardContent className="py-6">
             <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
@@ -367,7 +400,7 @@ export function ChapterSelector({
                 <div>
                   <h3 className="font-semibold text-foreground">Try Demo Questions</h3>
                   <p className="text-sm text-muted-foreground">
-                    10 sample questions from various chapters - no login required
+                    10 sample questions from various chapters
                   </p>
                 </div>
               </div>
@@ -446,7 +479,8 @@ export function ChapterSelector({
                 key={chapter.id}
                 chapter={chapter}
                 index={index}
-                isUnlocked={isPaidUser || index < 2}
+                isUnlocked={getChapterUnlocked("11", index)}
+                isTrial={isTrial}
                 onClick={() => handleChapterClick(chapter)}
               />
             ))}
@@ -460,7 +494,8 @@ export function ChapterSelector({
                 key={chapter.id}
                 chapter={chapter}
                 index={index}
-                isUnlocked={isPaidUser || index < 2}
+                isUnlocked={getChapterUnlocked("12", index)}
+                isTrial={isTrial}
                 onClick={() => handleChapterClick(chapter)}
               />
             ))}
@@ -478,10 +513,25 @@ export function ChapterSelector({
 
       {!isPaidUser && activeTab !== "pyq" && (
         <div className="mt-8 p-6 bg-secondary/50 rounded-lg text-center">
-          <p className="text-foreground font-medium mb-2">Unlock all 38 chapters with Premium</p>
-          <p className="text-muted-foreground text-sm mb-4">
-            Get access to 3800+ MCQs, mock tests, and detailed analytics
-          </p>
+          {isTrial ? (
+            <>
+              <p className="text-foreground font-medium mb-2">
+                Trial: {TRIAL_MAX_CHAPTERS} of 38 chapters unlocked
+              </p>
+              <p className="text-muted-foreground text-sm mb-4">
+                Upgrade to Premium for all 38 chapters + unlimited mock tests
+              </p>
+            </>
+          ) : (
+            <>
+              <p className="text-foreground font-medium mb-2">
+                Unlock all 38 chapters with Premium
+              </p>
+              <p className="text-muted-foreground text-sm mb-4">
+                Get access to 3800+ MCQs, mock tests, and detailed analytics
+              </p>
+            </>
+          )}
           <Button asChild><a href="/pricing">View Pricing</a></Button>
         </div>
       )}

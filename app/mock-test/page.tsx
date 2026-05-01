@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
 import { AuthProvider, useAuth } from "@/lib/auth-context";
+import { isPremium, isTrial } from "@/lib/checkPremium";
 import { MockTestSelector } from "@/components/mock-test/mock-test-selector";
 import { MockTestInterface } from "@/components/mock-test/mock-test-interface";
 import { MockTestResult } from "@/components/mock-test/mock-test-result";
@@ -18,12 +19,13 @@ type MockTestResultData = {
   questions: Question[];
   answers: MockTestAnswer[];
   timeTaken: number;
-  testLabel: string; // actual naam pass karo
+  testLabel: string;
 };
 
 function MockTestContentWrapper({ onTestStateChange }: { onTestStateChange: (inTest: boolean) => void }) {
   const { user } = useAuth();
-  const isPaid = user?.isPaid ?? false;
+  const isPaid = isPremium(user);
+  const isTrialUser = isTrial(user);
   const [testState, setTestState] = useState<MockTestState>("selection");
   const [testType, setTestType] = useState<"full" | "preview">("preview");
   const [mockTestId, setMockTestId] = useState<string | undefined>(undefined);
@@ -48,7 +50,6 @@ function MockTestContentWrapper({ onTestStateChange }: { onTestStateChange: (inT
     setTestState("test");
     onTestStateChange(true);
 
-    // Actual mock test naam Supabase se fetch karo
     if (manualTestId) {
       const { data: mockTest } = await supabase
         .from("mock_tests")
@@ -80,7 +81,11 @@ function MockTestContentWrapper({ onTestStateChange }: { onTestStateChange: (inT
   return (
     <>
       {testState === "selection" && (
-        <MockTestSelector onStartTest={handleStartTest} isPaidUser={isPaid} />
+        <MockTestSelector
+          onStartTest={handleStartTest}
+          isPaidUser={isPaid}
+          isTrial={isTrialUser}
+        />
       )}
       {testState === "test" && (
         <ErrorBoundary fallback={

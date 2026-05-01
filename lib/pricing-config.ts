@@ -3,14 +3,25 @@
  * All pricing UI and backend logic should reference this config
  */
 export const PRICING = {
-  crash: {
-    id: "crash",
-    price: 299,
+  trial: {
+    id: "trial",
+    price: 29,
+    currency: "INR",
+    durationDays: 5,
+    label: "5 Day Trial",
+    description: "NEET Biology 5-Day Premium Trial",
+    displayText: "5 days of premium access",
+    maxChapters: 5,
+    maxMockTests: 3,
+  },
+  monthly: {
+    id: "monthly",
+    price: 249,
     currency: "INR",
     durationDays: 30,
     label: "30 Days Access",
-    description: "NEET Final 30 Days Crash Pack",
-    displayText: "Last 30 days intensive preparation",
+    description: "NEET 30 Days Crash Pack",
+    displayText: "30 days intensive preparation",
   },
   sixMonth: {
     id: "sixMonth",
@@ -71,3 +82,8 @@ export const isSubscriptionExpiringSoon = (subscriptionEnd: Date): boolean => {
   sevenDaysFromNow.setDate(sevenDaysFromNow.getDate() + 7);
   return subscriptionEnd <= sevenDaysFromNow && subscriptionEnd > today;
 };
+
+// Trial helper
+export const isTrial = (planId?: string) => planId === "trial";
+export const TRIAL_MAX_CHAPTERS = 5;
+export const TRIAL_MAX_MOCK_TESTS = 3;

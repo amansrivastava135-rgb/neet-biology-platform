@@ -63,7 +63,7 @@ function PricingContent() {
     if (!promo.code.trim()) return;
     setPromo((p) => ({ ...p, status: "loading", message: "" }));
 
-    const paidPlans = ["crash", "sixMonth", "premium"];
+    const paidPlans = ["monthly", "sixMonth", "premium"];
     const results: Record<string, PromoResult> = {};
     let anyValid = false;
     let lastMessage = "This code is not applicable for any plan";
@@ -309,7 +309,50 @@ function PricingContent() {
             </div>
           )}
 
-          {/* Crash Pack */}
+          {/* Trial Card */}
+          {!isPaid && (
+  <div className="max-w-4xl mx-auto mb-6">
+    <Card className="border-green-400 bg-green-50 dark:bg-green-950/20 relative">
+      <Badge className="absolute top-4 right-4 bg-green-500 text-white">
+        New
+      </Badge>
+      <CardHeader className="pb-2">
+        <CardTitle className="text-xl flex items-center gap-2">
+          <Shield className="h-5 w-5 text-green-500" />
+          5-Day Premium Trial
+        </CardTitle>
+        <CardDescription>
+          Try before you buy · Full premium access for 5 days
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <ul className="text-sm text-muted-foreground space-y-1">
+            <li>✅ 5 Chapters unlocked</li>
+            <li>✅ 3 Full Mock Tests</li>
+            <li>✅ Performance Analytics</li>
+            <li>✅ PYQs Access</li>
+          </ul>
+          <div className="text-center min-w-[140px]">
+            <div className="text-4xl font-bold text-foreground mb-2">₹29</div>
+            <p className="text-xs text-muted-foreground mb-2">One-time · 5 days</p>
+            <Button
+              className="bg-green-500 hover:bg-green-600 text-white border-0 w-full"
+              onClick={() => handleBuy("trial")}
+              disabled={loading && activePlanId === "trial"}
+            >
+              {loading && activePlanId === "trial"
+                ? "Processing..."
+                : "Start Trial — ₹29"}
+            </Button>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  </div>
+)}
+
+          {/* Monthly Plan */}
           {!isPaid && (
             <div className="max-w-4xl mx-auto mb-8">
               <Card className="border-orange-400 bg-orange-50 dark:bg-orange-950/20 relative">
@@ -319,7 +362,7 @@ function PricingContent() {
                 <CardHeader className="pb-2">
                   <CardTitle className="text-xl flex items-center gap-2">
                     <Zap className="h-5 w-5 text-orange-500" />
-                    NEET Final 30 Days Crash Pack
+                    NEET 30 Days Monthly Plan
                   </CardTitle>
                   <CardDescription>Valid Till NEET Exam · Full access for 30 days</CardDescription>
                 </CardHeader>
@@ -332,27 +375,27 @@ function PricingContent() {
                       <li>✅ Performance Analytics</li>
                     </ul>
                     <div className="text-center min-w-[140px]">
-                      {getPromoForPlan("crash") ? (
+                      {getPromoForPlan("monthly") ? (
                         <div className="mb-2">
                           <span className="text-2xl line-through text-muted-foreground">
-                            ₹{PRICING.crash.price}
+                            ₹{PRICING.monthly.price}
                           </span>
                           <span className="text-4xl font-bold text-foreground ml-2">
-                            ₹{getPromoForPlan("crash")!.finalPrice}
+                            ₹{getPromoForPlan("monthly")!.finalPrice}
                           </span>
                           <p className="text-xs text-green-600 mt-1">
-                            {getPromoForPlan("crash")!.message}
+                            {getPromoForPlan("monthly")!.message}
                           </p>
                         </div>
                       ) : (
-                        <div className="text-4xl font-bold text-foreground mb-2">₹299</div>
+                        <div className="text-4xl font-bold text-foreground mb-2">₹249</div>
                       )}
                       <Button
                         className="bg-orange-500 hover:bg-orange-600 text-white border-0 w-full"
-                        onClick={() => handleBuy("crash")}
-                        disabled={loading && activePlanId === "crash"}
+                        onClick={() => handleBuy("monthly")}
+                        disabled={loading && activePlanId === "monthly"}
                       >
-                        {loading && activePlanId === "crash" ? "Processing..." : "Buy Crash Pack"}
+                        {loading && activePlanId === "monthly" ? "Processing..." : "Buy Monthly Plan"}
                       </Button>
                     </div>
                   </div>
@@ -404,7 +447,7 @@ function PricingContent() {
               <Card className="border-border"><CardContent className="pt-6"><BookOpen className="h-10 w-10 text-primary mb-4" /><h3 className="font-semibold text-foreground mb-2">38 Complete Chapters</h3><p className="text-sm text-muted-foreground">Full access to Class 11 and Class 12 NCERT Biology chapters</p></CardContent></Card>
               <Card className="border-border"><CardContent className="pt-6"><FileText className="h-10 w-10 text-primary mb-4" /><h3 className="font-semibold text-foreground mb-2">3800+ MCQs</h3><p className="text-sm text-muted-foreground">100 questions per chapter with detailed NCERT-based explanations</p></CardContent></Card>
               <Card className="border-border"><CardContent className="pt-6"><Zap className="h-10 w-10 text-primary mb-4" /><h3 className="font-semibold text-foreground mb-2">NEET PYQs</h3><p className="text-sm text-muted-foreground">Previous year questions from 2010-2024 with solutions</p></CardContent></Card>
-              <Card className="border-border"><CardContent className="pt-6"><Clock className="h-10 w-10 text-primary mb-4" /><h3 className="font-semibold text-foreground mb-2">Full Mock Tests</h3><p className="text-sm text-muted-foreground">180-question NEET pattern tests with 3-hour timer</p></CardContent></Card>
+              <Card className="border-border"><CardContent className="pt-6"><Clock className="h-10 w-10 text-primary mb-4" /><h3 className="font-semibold text-foreground mb-2">Full Mock Tests</h3><p className="text-sm text-muted-foreground">90-question NEET pattern tests with 1.5-hour timer</p></CardContent></Card>
               <Card className="border-border"><CardContent className="pt-6"><BarChart3 className="h-10 w-10 text-primary mb-4" /><h3 className="font-semibold text-foreground mb-2">Advanced Analytics</h3><p className="text-sm text-muted-foreground">Detailed performance tracking and weak area identification</p></CardContent></Card>
               <Card className="border-border"><CardContent className="pt-6"><Shield className="h-10 w-10 text-primary mb-4" /><h3 className="font-semibold text-foreground mb-2">Secure & Private</h3><p className="text-sm text-muted-foreground">Your data is secure and your progress is saved automatically</p></CardContent></Card>
             </div>
@@ -419,7 +462,7 @@ function PricingContent() {
               <Card className="border-border"><CardContent className="pt-6"><h3 className="font-semibold text-foreground mb-2">Can I cancel my subscription anytime?</h3><p className="text-sm text-muted-foreground">Yes, you can cancel your subscription at any time. Your access will continue until the end of your billing period.</p></CardContent></Card>
               <Card className="border-border"><CardContent className="pt-6"><h3 className="font-semibold text-foreground mb-2">Is the content based on NCERT?</h3><p className="text-sm text-muted-foreground">Yes, all questions and explanations are strictly based on NCERT Biology textbooks and NEET exam patterns.</p></CardContent></Card>
               <Card className="border-border"><CardContent className="pt-6"><h3 className="font-semibold text-foreground mb-2">What payment methods are accepted?</h3><p className="text-sm text-muted-foreground">We accept UPI, debit cards, credit cards, and net banking through our secure payment gateway.</p></CardContent></Card>
-              <Card className="border-border"><CardContent className="pt-6"><h3 className="font-semibold text-foreground mb-2">What is the Crash Pack?</h3><p className="text-sm text-muted-foreground">The Crash Pack gives you 30 days of full access to all features — perfect for last-minute NEET preparation at just ₹299.</p></CardContent></Card>
+              <Card className="border-border"><CardContent className="pt-6"><h3 className="font-semibold text-foreground mb-2">What is the Monthly Pack?</h3><p className="text-sm text-muted-foreground">The Monthly Pack gives you 30 days of full access to all features — perfect for last-minute NEET preparation at just ₹249.</p></CardContent></Card>
               <Card className="border-border"><CardContent className="pt-6"><h3 className="font-semibold text-foreground mb-2">Do you have promo codes?</h3><p className="text-sm text-muted-foreground">Yes! Follow our social media or ask your coaching partner for exclusive promo codes and get instant discounts.</p></CardContent></Card>
             </div>
           </div>

@@ -26,11 +26,13 @@ export async function POST(req: Request) {
       const paymentData = payment.payload?.payment?.entity;
       const email = paymentData?.email;
       // Webhook me plan detect karo description se, default premium
-      const planId = paymentData?.description?.includes("crash")
-        ? "crash"
-        : paymentData?.description?.includes("sixMonth")
-        ? "sixMonth"
-        : "premium";
+      const planId = paymentData?.description?.includes("trial")
+  ? "trial"
+  : paymentData?.description?.includes("monthly")
+  ? "monthly"
+  : paymentData?.description?.includes("sixMonth")
+  ? "sixMonth"
+  : "premium";
       const plan = getPlanById(planId);
 
       if (email) {

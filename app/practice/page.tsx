@@ -1,10 +1,10 @@
 ﻿"use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
 import { AuthProvider, useAuth } from "@/lib/auth-context";
-import { isPremium } from "@/lib/checkPremium";
+import { isPremium, isTrial } from "@/lib/checkPremium";
 import { ChapterSelector } from "@/components/practice/chapter-selector";
 import { MockTestResult } from "@/components/mock-test/mock-test-result";
 import { TestEngine } from "@/components/test-engine/TestEngine";
@@ -24,6 +24,7 @@ type PracticeMode =
 function PracticeContent() {
   const { user } = useAuth();
   const isPaid = isPremium(user);
+  const isTrialUser = isTrial(user);
   const searchParams = useSearchParams();
   const isDemoParam = searchParams.get("demo") === "true";
 
@@ -43,14 +44,10 @@ function PracticeContent() {
   const [storageKey, setStorageKey] = useState("");
   const [testType, setTestType] = useState("practice");
 
-  // Questions fetch karo jab mode change ho
   useEffect(() => {
     if (mode.type === "none") return;
     if (mode.type === "demo") {
-      setQuestions(getDemoQuestions().map(q => ({
-        ...q,
-        options: q.options,
-      })));
+      setQuestions(getDemoQuestions().map(q => ({ ...q, options: q.options })));
       setTestLabel("Demo Practice");
       setStorageKey("neet-practice-demo");
       setTestType("preview");
@@ -65,8 +62,6 @@ function PracticeContent() {
             `/api/questions?chapterId=${mode.chapterId}&setNumber=${mode.setNumber}`
           );
           const data = await res.json();
-
-          // Supabase format → Question format convert
           const converted: Question[] = (data.questions || []).map((q: any) => ({
             id: q.id,
             question: q.question,
@@ -90,9 +85,7 @@ function PracticeContent() {
         }
 
         if (mode.type === "pyq-year") {
-          const res = await fetch(
-            `/api/questions?source=PYQ&year=${mode.year}`
-          );
+          const res = await fetch(`/api/questions?source=PYQ&year=${mode.year}`);
           const data = await res.json();
           const converted: Question[] = (data.questions || []).map((q: any) => ({
             id: q.id,
@@ -112,9 +105,7 @@ function PracticeContent() {
         }
 
         if (mode.type === "pyq-chapter") {
-          const res = await fetch(
-            `/api/questions?chapterId=${mode.chapterId}&source=PYQ`
-          );
+          const res = await fetch(`/api/questions?chapterId=${mode.chapterId}&source=PYQ`);
           const data = await res.json();
           const converted: Question[] = (data.questions || []).map((q: any) => ({
             id: q.id,
@@ -189,6 +180,7 @@ function PracticeContent() {
           window.location.href = url.toString();
         }}
         isPaidUser={isPaid}
+        isTrial={isTrialUser}
       />
     );
   }

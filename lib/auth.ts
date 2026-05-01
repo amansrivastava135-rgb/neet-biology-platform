@@ -12,6 +12,7 @@ export interface JWTUser {
   isPaid: boolean;
   subscriptionPlan?: string;
   subscriptionEnd?: string;
+  trialMockUsed?: number; // track trial mock test usage
 }
 
 export async function signToken(user: JWTUser): Promise<string> {
@@ -32,7 +33,8 @@ export async function verifyToken(token: string): Promise<JWTUser | null> {
       typeof payload.email !== "string" ||
       typeof payload.name !== "string" ||
       typeof payload.isAdmin !== "boolean" ||
-      typeof payload.isPaid !== "boolean"
+      typeof payload.isPaid !== "boolean" ||
+      typeof payload.trialMockUsed !== "number"
     ) {
       return null;
     }

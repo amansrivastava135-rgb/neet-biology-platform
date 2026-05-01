@@ -10,6 +10,7 @@ import { getRemainingDays } from "@/lib/subscription-utils";
 import { useAuth } from "@/lib/auth-context";
 import { LeaderboardTable } from "@/components/leaderboard/LeaderboardTable";
 import { supabase } from "@/lib/supabase";
+import { TRIAL_MAX_MOCK_TESTS } from "@/lib/pricing-config";
 
 type MockTest = {
   id: string;
@@ -23,9 +24,10 @@ type MockTest = {
 type MockTestSelectorProps = {
   onStartTest: (type: "full" | "preview", mockTestId?: string, autoTestIndex?: number) => void;
   isPaidUser: boolean;
+  isTrial?: boolean;
 };
 
-export function MockTestSelector({ onStartTest, isPaidUser }: MockTestSelectorProps) {
+export function MockTestSelector({ onStartTest, isPaidUser, isTrial = false }: MockTestSelectorProps) {
   const { user } = useAuth();
   const remainingDays = user ? getRemainingDays(user) : 0;
   const [mockTests, setMockTests] = useState<MockTest[]>([]);
@@ -43,10 +45,12 @@ export function MockTestSelector({ onStartTest, isPaidUser }: MockTestSelectorPr
     fetchMockTests();
   }, []);
 
+  // Trial users ke liye sirf pehle 3 tests
+  const visibleTests = isTrial ? mockTests.slice(0, TRIAL_MAX_MOCK_TESTS) : mockTests;
+
   return (
     <div className="container mx-auto px-4 py-8">
 
-      {/* Page Header — Result History button hataya */}
       <div className="text-center mb-8">
         <h1 className="text-3xl font-bold text-foreground mb-2">NEET Mock Tests</h1>
         <p className="text-muted-foreground">
@@ -54,7 +58,9 @@ export function MockTestSelector({ onStartTest, isPaidUser }: MockTestSelectorPr
         </p>
         {isPaidUser && (
           <div className="mt-4 flex items-center justify-center gap-2">
-            <Badge variant="secondary">Premium Active</Badge>
+            <Badge variant={isTrial ? "outline" : "secondary"}>
+              {isTrial ? "Trial Active" : "Premium Active"}
+            </Badge>
             {remainingDays > 0 && (
               <span className="text-sm text-muted-foreground">
                 {remainingDays} days remaining
@@ -63,6 +69,23 @@ export function MockTestSelector({ onStartTest, isPaidUser }: MockTestSelectorPr
           </div>
         )}
       </div>
+
+      {/* Trial Banner */}
+      {isTrial && (
+        <div className="max-w-4xl mx-auto mb-6 p-4 bg-amber-50 border border-amber-200 rounded-lg flex items-center justify-between gap-4">
+          <div>
+            <p className="text-sm font-semibold text-amber-900">
+              Trial: Up to {TRIAL_MAX_MOCK_TESTS} mock tests available
+            </p>
+            <p className="text-xs text-amber-700 mt-0.5">
+              Upgrade to Premium for unlimited mock tests
+            </p>
+          </div>
+          <Button size="sm" asChild className="shrink-0">
+            <Link href="/pricing">Upgrade</Link>
+          </Button>
+        </div>
+      )}
 
       {/* Top Cards */}
       <div className={`grid grid-cols-1 ${!isPaidUser ? "md:grid-cols-2" : "md:grid-cols-1"} gap-6 max-w-4xl mx-auto mb-10`}>
@@ -115,7 +138,9 @@ export function MockTestSelector({ onStartTest, isPaidUser }: MockTestSelectorPr
           <h2 className="text-xl font-bold text-foreground mb-4">
             Available Mock Tests
             <Badge variant="secondary" className="ml-2">
-              {isLoading ? "..." : mockTests.length}
+              {isLoading ? "..." : isTrial
+                ? `${Math.min(mockTests.length, TRIAL_MAX_MOCK_TESTS)} of ${TRIAL_MAX_MOCK_TESTS}`
+                : mockTests.length}
             </Badge>
           </h2>
 
@@ -131,7 +156,7 @@ export function MockTestSelector({ onStartTest, isPaidUser }: MockTestSelectorPr
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {mockTests.map((test) => (
+              {visibleTests.map((test) => (
                 <Card key={test.id} className="border-border hover:border-primary/50 transition-colors">
                   <CardContent className="pt-6">
                     <div className="flex items-center justify-between mb-3">
@@ -154,6 +179,29 @@ export function MockTestSelector({ onStartTest, isPaidUser }: MockTestSelectorPr
                   </CardContent>
                 </Card>
               ))}
+
+              {/* Trial: locked remaining tests dikhao */}
+              {isTrial && mockTests.length > TRIAL_MAX_MOCK_TESTS &&
+                mockTests.slice(TRIAL_MAX_MOCK_TESTS).map((test) => (
+                  <Card key={test.id} className="border-border opacity-60">
+                    <CardContent className="pt-6">
+                      <div className="flex items-center justify-between mb-3">
+                        <span className="font-medium text-foreground">{test.name}</span>
+                        <Lock className="h-4 w-4 text-muted-foreground" />
+                      </div>
+                      <div className="flex items-center gap-2 mb-4 text-xs text-muted-foreground">
+                        <Clock className="h-3 w-3" />
+                        <span>90 Minutes</span>
+                        <Target className="h-3 w-3 ml-2" />
+                        <span>Full Syllabus</span>
+                      </div>
+                      <Button className="w-full" variant="secondary" asChild>
+                        <Link href="/pricing">Upgrade to Unlock</Link>
+                      </Button>
+                    </CardContent>
+                  </Card>
+                ))
+              }
             </div>
           )}
         </div>
@@ -201,7 +249,7 @@ export function MockTestSelector({ onStartTest, isPaidUser }: MockTestSelectorPr
         </CardContent>
       </Card>
 
-      {/* Leaderboard */}
+      {/* Leaderboard — trial users ko bhi dikhao */}
       {isPaidUser && (
         <div className="max-w-4xl mx-auto">
           <h2 className="text-xl font-bold text-foreground mb-4">🏆 Leaderboard</h2>

@@ -17,12 +17,18 @@ export function isPremium(user?: User | null): boolean {
   // Date valid hai — check karo expire hua ya nahi
   if (endDate.getTime() <= Date.now()) return false;
 
-  // Plan check — crash, sixMonth, premium sab valid hain
-  const validPlans = ["premium", "crash", "sixMonth"];
+  // Plan check — trial, monthly, sixMonth, premium sab valid hain
+  const validPlans = ["premium", "monthly", "sixMonth", "trial"];
   const planValid =
     validPlans.includes(user.subscriptionPlan || "") ||
     validPlans.includes(user.plan || "") ||
     user.subscription === "active";
 
   return planValid;
+}
+export const TRIAL_MAX_CHAPTERS = 5;
+
+export function isTrial(user?: User | null): boolean {
+  if (!user || !user.isPaid) return false;
+  return user.subscriptionPlan === "trial" || user.plan === "trial";
 }

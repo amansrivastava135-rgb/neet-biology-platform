@@ -6,7 +6,6 @@ import { getCurrentUser, signToken, getTokenCookieOptions } from "@/lib/auth";
 
 export async function POST(req: NextRequest) {
   try {
-    // Auth check — JWT se user lo, body ke email pe bharosa nahi
     const user = await getCurrentUser();
     if (!user) {
       return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
@@ -39,15 +38,23 @@ export async function POST(req: NextRequest) {
     const now = new Date();
     const subscriptionEnd = calculateSubscriptionEnd(now, plan.durationDays);
 
+    // Build update object
+    const updateData: any = {
+      is_paid: true,
+      subscription_plan: plan.id,
+      subscription_start: now.toISOString(),
+      subscription_end: subscriptionEnd.toISOString(),
+    };
+
+    // Trial — mock usage counter initialize karo
+    if (plan.id === "trial") {
+      updateData.trial_mock_used = 0;
+    }
+
     const { error } = await supabaseAdmin
       .from("users")
-      .update({
-        is_paid: true,
-        subscription_plan: plan.id,
-        subscription_start: now.toISOString(),
-        subscription_end: subscriptionEnd.toISOString(),
-      })
-      .eq("email", user.email); // body email nahi, JWT email
+      .update(updateData)
+      .eq("email", user.email);
 
     if (error) console.error("Supabase update error:", error);
 
@@ -62,7 +69,6 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // Cookie mein updated token set karo — isPaid: true reflect ho
     const newToken = await signToken({
       id: user.id,
       email: user.email,
@@ -71,6 +77,7 @@ export async function POST(req: NextRequest) {
       isPaid: true,
       subscriptionPlan: plan.id,
       subscriptionEnd: subscriptionEnd.toISOString(),
+      trialMockUsed: plan.id === "trial" ? 0 : undefined,
     });
 
     const userForClient = {

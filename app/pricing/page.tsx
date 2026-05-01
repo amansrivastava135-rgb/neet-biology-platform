@@ -15,6 +15,11 @@ import { useRouter } from "next/navigation";
 import { PRICING } from "@/lib/pricing-config";
 import { PricingCard } from "@/components/PricingCard";
 
+export const metadata = {
+  title: "MASTER360 Pricing – NEET Biology Subscription Plans",
+  description: "Affordable NEET Biology preparation plans on MASTER360 starting at ₹299. Unlock 3800+ MCQs and mock tests.",
+};
+
 const allFeatures = [
   { name: "10 Demo Questions", free: true, paid: true },
   { name: "Mock Test Preview", free: true, paid: true },

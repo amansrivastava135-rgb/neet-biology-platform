@@ -16,26 +16,30 @@ const merriweather = Merriweather({
 
 export const metadata: Metadata = {
   title: {
-    default: 'Dr. Amankumar Srivastav | NEET Biology Preparation',
-    template: '%s | NEET Biology by Dr. Amankumar Srivastav',
+    default: 'MASTER360 – NEET Biology Mock Tests, MCQs & PYQs Platform',
+    template: '%s | MASTER360',
   },
-  description: 'Master NCERT Biology for NEET with 3800+ MCQs, chapter-wise practice, PYQs (2010-2024), mock tests, and performance analytics. Expert guidance by Dr. Amankumar Srivastav.',
-  keywords: ['NEET Biology', 'NCERT Biology', 'NEET Preparation', 'Biology MCQ', 'NEET PYQ', 'Medical Entrance', 'NEET 2025', 'NEET 2026', 'Biology Mock Test', 'NCERT MCQ'],
+  description: 'MASTER360 is a complete NEET Biology preparation platform with 3800+ MCQs, chapter-wise practice, PYQs (2010-2024), mock tests, and performance analytics by Dr. Amankumar Srivastav.',
+  keywords: [
+    'MASTER360', 'NEET Biology', 'NCERT Biology', 'NEET Preparation',
+    'Biology MCQ', 'NEET PYQ', 'Medical Entrance', 'NEET 2025', 'NEET 2026',
+    'Biology Mock Test', 'NCERT MCQ', 'Dr. Amankumar Srivastav',
+  ],
   authors: [{ name: 'Dr. Amankumar Srivastav' }],
-  creator: 'Dr. Amankumar Srivastav',
-  metadataBase: new URL('https://neet-biology-platform.vercel.app'),
+  creator: 'MASTER360',
+  metadataBase: new URL('https://master360.vercel.app'),
   openGraph: {
     type: 'website',
     locale: 'en_IN',
-    url: 'https://neet-biology-platform.vercel.app',
-    siteName: 'Dr. Amankumar Srivastav Pvt Tutorials',
-    title: 'NEET Biology Preparation | 3800+ MCQs & Mock Tests',
-    description: 'Master NCERT Biology for NEET with chapter-wise practice, PYQs, mock tests, and analytics.',
+    url: 'https://master360.vercel.app',
+    siteName: 'MASTER360',
+    title: 'MASTER360 – NEET Biology Mock Tests, MCQs & PYQs Platform',
+    description: 'MASTER360 is a complete NEET Biology preparation platform with MCQs, PYQs, mock tests, and analytics.',
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'NEET Biology Preparation | Dr. Amankumar Srivastav',
-    description: 'Master NCERT Biology for NEET with 3800+ MCQs, mock tests, and analytics.',
+    title: 'MASTER360 – NEET Biology Preparation Platform',
+    description: 'MASTER360: 3800+ MCQs, PYQs, mock tests, and performance analytics for NEET Biology.',
   },
   robots: {
     index: true,
@@ -45,7 +49,7 @@ export const metadata: Metadata = {
       follow: true,
     },
   },
-verification: {
+  verification: {
     google: '8wjsGDVb9cj7iZPsFWXiZMmoWln2hjb7bbE5R8piAfk',
   },
 }

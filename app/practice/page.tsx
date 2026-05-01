@@ -14,6 +14,12 @@ import { Button } from "@/components/ui/button";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import { Suspense } from "react";
 
+export const metadata = {
+  title: "MASTER360 Practice – NEET Biology Chapter-wise MCQs",
+  description: "Practice 3800+ NEET Biology MCQs chapter-wise on MASTER360. All 38 NCERT chapters covered.",
+};
+
+
 type PracticeMode =
   | { type: "none" }
   | { type: "demo" }

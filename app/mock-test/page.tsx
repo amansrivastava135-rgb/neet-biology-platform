@@ -14,6 +14,10 @@ import { supabase } from "@/lib/supabase";
 
 export type MockTestState = "selection" | "test" | "result";
 export type MockTestAnswer = string | null;
+export const metadata = {
+  title: "MASTER360 Mock Tests – Full NEET Biology Practice Tests",
+  description: "Take full-length NEET Biology mock tests on MASTER360. Track your performance with detailed analytics.",
+};
 
 type MockTestResultData = {
   questions: Question[];

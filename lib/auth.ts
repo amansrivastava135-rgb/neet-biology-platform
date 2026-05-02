@@ -12,7 +12,7 @@ export interface JWTUser {
   isPaid: boolean;
   subscriptionPlan?: string;
   subscriptionEnd?: string;
-  trialMockUsed?: number; // track trial mock test usage
+  trialMockUsed?: number;
 }
 
 export async function signToken(user: JWTUser): Promise<string> {
@@ -27,14 +27,12 @@ export async function verifyToken(token: string): Promise<JWTUser | null> {
   try {
     const { payload } = await jwtVerify(token, JWT_SECRET);
 
-    // Safe validation — agar koi field missing ho to null return karo
+    // Sirf id, email, isAdmin, isPaid strict check — baaki optional
     if (
       typeof payload.id !== "string" ||
       typeof payload.email !== "string" ||
-      typeof payload.name !== "string" ||
       typeof payload.isAdmin !== "boolean" ||
-      typeof payload.isPaid !== "boolean" ||
-      typeof payload.trialMockUsed !== "number"
+      typeof payload.isPaid !== "boolean"
     ) {
       return null;
     }
@@ -42,11 +40,14 @@ export async function verifyToken(token: string): Promise<JWTUser | null> {
     return {
       id: payload.id,
       email: payload.email,
-      name: payload.name,
+      name: typeof payload.name === "string" ? payload.name : "",
       isAdmin: payload.isAdmin,
       isPaid: payload.isPaid,
       subscriptionPlan: payload.subscriptionPlan as string | undefined,
       subscriptionEnd: payload.subscriptionEnd as string | undefined,
+      trialMockUsed: typeof payload.trialMockUsed === "number"
+        ? payload.trialMockUsed
+        : 0,
     };
   } catch {
     return null;

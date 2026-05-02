@@ -39,38 +39,31 @@ export function StudentManager() {
   const [filterStatus, setFilterStatus] = useState("all");
   const [loadingEmail, setLoadingEmail] = useState<string | null>(null);
   const [grantPlanId, setGrantPlanId] = useState<Record<string, string>>({});
+  const [isLoading, setIsLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
   const loadStudents = async () => {
+    setIsLoading(true);
+    setFetchError(null);
     try {
-      const res = await fetch("/api/admin/students");
+      const res = await fetch("/api/admin/students", {
+        credentials: "include",
+      });
       if (res.ok) {
         const data = await res.json();
         if (data.students) {
           setStudents(data.students);
-          return;
         }
+      } else {
+        const data = await res.json();
+        setFetchError(data.error || "Failed to load students");
       }
     } catch (err) {
-      console.error("Supabase load failed, falling back to localStorage", err);
+      console.error("Students load failed:", err);
+      setFetchError("Network error. Please try again.");
+    } finally {
+      setIsLoading(false);
     }
-
-    const registeredUsers = JSON.parse(
-      localStorage.getItem("neet_registered_users") || "{}"
-    );
-    const studentList: StudentData[] = Object.values(registeredUsers).map(
-      (entry: any) => ({
-        id: entry.user.id,
-        name: entry.user.name,
-        email: entry.user.email,
-        isPaid: entry.user.isPaid || false,
-        joinedAt: entry.user.id
-          ? new Date(parseInt(entry.user.id)).toLocaleDateString()
-          : "N/A",
-        subscriptionEnd: entry.user.subscriptionEnd,
-        subscriptionPlan: entry.user.subscriptionPlan,
-      })
-    );
-    setStudents(studentList);
   };
 
   useEffect(() => {
@@ -86,34 +79,12 @@ export function StudentManager() {
       const res = await fetch("/api/admin/grant-premium", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({ email, action: "grant", planId }),
       });
 
       const data = await res.json();
       if (data.success) {
-        // localStorage bhi update karo
-        const registeredUsers = JSON.parse(
-          localStorage.getItem("neet_registered_users") || "{}"
-        );
-        if (registeredUsers[email]) {
-          const now = new Date();
-          const expiry = new Date(
-            now.getTime() + plan.durationDays * 24 * 60 * 60 * 1000
-          );
-          registeredUsers[email].user = {
-            ...registeredUsers[email].user,
-            isPaid: true,
-            subscriptionPlan: plan.id,
-            subscription: "active",
-            subscriptionStart: now.toISOString(),
-            subscriptionEnd: expiry.toISOString(),
-            plan: plan.id,
-          };
-          localStorage.setItem(
-            "neet_registered_users",
-            JSON.stringify(registeredUsers)
-          );
-        }
         await loadStudents();
         alert(`✅ ${plan.id} activated for ${email}! (${plan.durationDays} days)`);
       } else {
@@ -132,27 +103,12 @@ export function StudentManager() {
       const res = await fetch("/api/admin/grant-premium", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({ email, action: "revoke" }),
       });
 
       const data = await res.json();
       if (data.success) {
-        const registeredUsers = JSON.parse(
-          localStorage.getItem("neet_registered_users") || "{}"
-        );
-        if (registeredUsers[email]) {
-          registeredUsers[email].user = {
-            ...registeredUsers[email].user,
-            isPaid: false,
-            subscriptionPlan: "free",
-            subscription: "free",
-            subscriptionEnd: undefined,
-          };
-          localStorage.setItem(
-            "neet_registered_users",
-            JSON.stringify(registeredUsers)
-          );
-        }
         await loadStudents();
         alert(`✅ Premium revoked for ${email}!`);
       } else {
@@ -259,7 +215,19 @@ export function StudentManager() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {students.length === 0 ? (
+          {isLoading ? (
+            <div className="text-center py-12">
+              <RefreshCw className="h-8 w-8 text-muted-foreground mx-auto mb-4 animate-spin" />
+              <p className="text-muted-foreground">Loading students...</p>
+            </div>
+          ) : fetchError ? (
+            <div className="text-center py-12">
+              <p className="text-red-500 mb-4">{fetchError}</p>
+              <Button variant="outline" onClick={loadStudents}>
+                Try Again
+              </Button>
+            </div>
+          ) : students.length === 0 ? (
             <div className="text-center py-12">
               <Users className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
               <p className="text-muted-foreground">No students registered yet.</p>
@@ -309,7 +277,6 @@ export function StudentManager() {
                           </Button>
                         ) : (
                           <div className="flex items-center gap-2">
-                            {/* Plan selector per row */}
                             <Select
                               value={grantPlanId[student.email] || "premium"}
                               onValueChange={(val) =>
@@ -323,7 +290,7 @@ export function StudentManager() {
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent>
-                                <SelectItem value="crash">Crash (30d)</SelectItem>
+                                <SelectItem value="monthly">Monthly (30d)</SelectItem>
                                 <SelectItem value="sixMonth">6 Month</SelectItem>
                                 <SelectItem value="premium">Yearly</SelectItem>
                               </SelectContent>

@@ -6,22 +6,25 @@ const razorpay = new Razorpay({
   key_secret: process.env.RAZORPAY_SECRET || "",
 });
 
-export function createOrder(amount: number, currency = "INR", receipt?: string) {
+export async function createOrder(
+  amount: number,
+  currency = "INR",
+  receipt?: string
+) {
   if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_SECRET) {
-    // Production mein error throw karo
     if (process.env.NODE_ENV === "production") {
       throw new Error("Razorpay keys not configured!");
     }
-    // Sirf development mein dummy order
-    return Promise.resolve({ id: `test_order_${Date.now()}`, amount, currency });
+    return { id: `test_order_${Date.now()}`, amount, currency };
   }
 
-  return razorpay.orders.create({
-    amount,
+  const order = await razorpay.orders.create({
+    amount,           // paise mein — 2900 = ₹29
     currency,
     receipt: receipt || `receipt_${Date.now()}`,
-    payment_capture: 1 as unknown as boolean,
   });
+
+  return order;
 }
 
 export function verifySignature(params: {
@@ -31,12 +34,10 @@ export function verifySignature(params: {
 }) {
   const secret = process.env.RAZORPAY_SECRET;
 
-  // Production mein secret hona zaroori hai
   if (!secret) {
     if (process.env.NODE_ENV === "production") {
       throw new Error("Razorpay secret not configured!");
     }
-    // Sirf development mein bypass
     console.warn("⚠️ Razorpay secret missing — bypassing in dev mode");
     return true;
   }

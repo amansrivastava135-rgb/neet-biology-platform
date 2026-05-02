@@ -76,6 +76,7 @@ function applySubscription(u: User, plan: string, days: number): User {
   return {
     ...u,
     subscriptionPlan: plan as User["subscriptionPlan"],
+    plan: plan,
     subscriptionStart: now.toISOString(),
     subscriptionEnd: expiry.toISOString(),
     subscription: "active",

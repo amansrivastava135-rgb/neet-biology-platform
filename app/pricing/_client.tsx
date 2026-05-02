@@ -4,17 +4,16 @@ import { useState } from "react";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
 import { AuthProvider, useAuth } from "@/lib/auth-context";
-import { isPremium } from "@/lib/checkPremium";
+import { isPremium, isTrial } from "@/lib/checkPremium";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Shield, Zap, BookOpen, FileText, BarChart3, Clock, Tag, CheckCircle, XCircle } from "lucide-react";
+import { Shield, Zap, BookOpen, FileText, BarChart3, Clock, Tag, CheckCircle, XCircle, Crown } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { PRICING } from "@/lib/pricing-config";
 import { PricingCard } from "@/components/PricingCard";
-
 
 const allFeatures = [
   { name: "10 Demo Questions", free: true, paid: true },
@@ -27,26 +26,91 @@ const allFeatures = [
   { name: "Weak Chapter Analysis", free: false, paid: true },
 ];
 
+const trialFeatures = [
+  { name: "10 Demo Questions", included: true },
+  { name: "Mock Test Preview", included: true },
+  { name: "5 Chapters Unlocked", included: true },
+  { name: "3 Full Mock Tests", included: true },
+  { name: "Basic Analytics", included: true },
+  { name: "All 38 Chapters", included: false },
+  { name: "Unlimited Mock Tests", included: false },
+];
+
 type PromoResult = {
   code: string;
   discountAmount: number;
   finalPrice: number;
   originalPrice: number;
   message: string;
-  planId: string; // which plan was validated
+  planId: string;
 };
 
 type PromoState = {
   code: string;
   status: "idle" | "loading" | "valid" | "invalid";
   message: string;
-  // Store results per plan so all cards can show correct price
   results: Record<string, PromoResult>;
 };
+
+// Plan label helper
+function getPlanLabel(planId?: string): string {
+  switch (planId) {
+    case "trial": return "5-Day Trial";
+    case "monthly": return "Monthly Plan";
+    case "sixMonth": return "6 Month Plan";
+    case "premium": return "Yearly Plan";
+    default: return "Premium";
+  }
+}
+
+function CurrentSubscriptionBanner({ user }: { user: any }) {
+  const planId = user?.subscriptionPlan || user?.plan;
+  const endDate = user?.subscriptionEnd || user?.subscription_end;
+  const isTrialUser = isTrial(user);
+
+  if (!planId || planId === "free" || !user?.isPaid) return null;
+
+  return (
+    <div className={`max-w-4xl mx-auto mb-8 p-4 rounded-lg border flex items-center justify-between gap-4 ${
+      isTrialUser
+        ? "bg-green-50 border-green-300"
+        : "bg-primary/5 border-primary/30"
+    }`}>
+      <div className="flex items-center gap-3">
+        <Crown className={`h-5 w-5 ${isTrialUser ? "text-green-600" : "text-primary"}`} />
+        <div>
+          <p className="font-semibold text-foreground">
+            {getPlanLabel(planId)} — Active
+          </p>
+          {endDate && (
+            <p className="text-sm text-muted-foreground">
+              Expires: {new Date(endDate).toLocaleDateString("en-IN", {
+                day: "numeric", month: "short", year: "numeric"
+              })}
+            </p>
+          )}
+          {isTrialUser && (
+            <p className="text-xs text-green-700 mt-0.5">
+              5 chapters + 3 mock tests available
+            </p>
+          )}
+        </div>
+      </div>
+      {isTrialUser && (
+        <Button size="sm" asChild>
+          <Link href="#plans">Upgrade Now</Link>
+        </Button>
+      )}
+    </div>
+  );
+}
 
 function PricingContent() {
   const { user, activateSubscription, updateUser } = useAuth();
   const isPaid = isPremium(user);
+  const isTrialUser = isTrial(user);
+  const currentPlanId = user?.subscriptionPlan || user?.plan;
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activePlanId, setActivePlanId] = useState<string | null>(null);
@@ -59,7 +123,6 @@ function PricingContent() {
     results: {},
   });
 
-  // Validate promo for ALL paid plans at once
   const validatePromo = async () => {
     if (!promo.code.trim()) return;
     setPromo((p) => ({ ...p, status: "loading", message: "" }));
@@ -69,18 +132,13 @@ function PricingContent() {
     let anyValid = false;
     let lastMessage = "This code is not applicable for any plan";
 
-    // Validate against each plan
     await Promise.all(
       paidPlans.map(async (planId) => {
         try {
           const res = await fetch("/api/payment/validate-promo", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              code: promo.code,
-              planId,
-              email: user?.email,
-            }),
+            body: JSON.stringify({ code: promo.code, planId, email: user?.email }),
           }).then((r) => r.json());
 
           if (res.valid) {
@@ -95,44 +153,22 @@ function PricingContent() {
             };
             lastMessage = res.message;
           }
-        } catch {
-          // ignore individual plan errors
-        }
+        } catch {}
       })
     );
 
     if (anyValid) {
-      setPromo((p) => ({
-        ...p,
-        status: "valid",
-        message: lastMessage,
-        results,
-      }));
+      setPromo((p) => ({ ...p, status: "valid", message: lastMessage, results }));
     } else {
-      // Get actual error from one plan
       try {
         const res = await fetch("/api/payment/validate-promo", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            code: promo.code,
-            planId: "premium",
-            email: user?.email,
-          }),
+          body: JSON.stringify({ code: promo.code, planId: "premium", email: user?.email }),
         }).then((r) => r.json());
-        setPromo((p) => ({
-          ...p,
-          status: "invalid",
-          message: res.message || "Invalid promo code",
-          results: {},
-        }));
+        setPromo((p) => ({ ...p, status: "invalid", message: res.message || "Invalid promo code", results: {} }));
       } catch {
-        setPromo((p) => ({
-          ...p,
-          status: "invalid",
-          message: "Invalid promo code",
-          results: {},
-        }));
+        setPromo((p) => ({ ...p, status: "invalid", message: "Invalid promo code", results: {} }));
       }
     }
   };
@@ -164,16 +200,12 @@ function PricingContent() {
 
       await loadRazorpay();
 
-      // Get promo result for this specific plan
       const promoResult = promo.status === "valid" ? promo.results[planId] : null;
 
       const orderRes = await fetch("/api/payment/create-order", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          planId,
-          promoCode: promoResult ? promo.code : null,
-        }),
+        body: JSON.stringify({ planId, promoCode: promoResult ? promo.code : null }),
       }).then((r) => r.json());
 
       const planData = PRICING[planId as keyof typeof PRICING];
@@ -201,10 +233,17 @@ function PricingContent() {
           }).then((r) => r.json());
 
           if (verifyRes.success) {
-            if (verifyRes.user) {
-              updateUser({ ...user, ...verifyRes.user, isPaid: true });
-            }
-            activateSubscription("NEET Test Series", planData.durationDays);
+            // updateUser se sahi plan localStorage mein save hoga
+            const updatedUser = {
+              ...user,
+              ...verifyRes.user,
+              isPaid: true,
+              subscriptionPlan: planId as any, // exact planId save karo
+              plan: planId,
+            };
+            await updateUser(updatedUser);
+            // activateSubscription mein planId pass karo — "NEET Test Series" nahi
+            await activateSubscription(planId, planData.durationDays);
             router.push("/dashboard");
           } else {
             setError("Payment verification failed. Please contact support.");
@@ -225,10 +264,14 @@ function PricingContent() {
     }
   };
 
-  // Helper — get promo display for a specific plan
   const getPromoForPlan = (planId: string) => {
     if (promo.status !== "valid") return undefined;
     return promo.results[planId];
+  };
+
+  // Check if specific plan is current plan
+  const isCurrentPlan = (planId: string) => {
+    return isPaid && (currentPlanId === planId);
   };
 
   return (
@@ -249,16 +292,19 @@ function PricingContent() {
             </p>
           </div>
 
-          {/* Error Message */}
+          {/* Current Subscription Banner */}
+          {isPaid && <CurrentSubscriptionBanner user={user} />}
+
+          {/* Error */}
           {error && (
             <div className="max-w-4xl mx-auto mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
               {error}
             </div>
           )}
 
-          {/* Promo Code Section */}
-          {!isPaid && (
-            <div className="max-w-4xl mx-auto mb-8">
+          {/* Promo Code — sirf non-paid ya trial users ko dikhao */}
+          {(!isPaid || isTrialUser) && (
+            <div className="max-w-4xl mx-auto mb-8" id="plans">
               <Card className="border-border">
                 <CardContent className="py-4">
                   <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
@@ -291,8 +337,6 @@ function PricingContent() {
                       </Button>
                     </div>
                   </div>
-
-                  {/* Promo Status */}
                   {promo.status === "valid" && (
                     <div className="mt-3 flex items-center gap-2 text-sm text-green-600">
                       <CheckCircle className="h-4 w-4" />
@@ -310,62 +354,59 @@ function PricingContent() {
             </div>
           )}
 
-          {/* Trial Card */}
+          {/* Trial Card — sirf non-paid users ko dikhao */}
           {!isPaid && (
-  <div className="max-w-4xl mx-auto mb-6">
-    <Card className="border-green-400 bg-green-50 dark:bg-green-950/20 relative">
-      <Badge className="absolute top-4 right-4 bg-green-500 text-white">
-        New
-      </Badge>
-      <CardHeader className="pb-2">
-        <CardTitle className="text-xl flex items-center gap-2">
-          <Shield className="h-5 w-5 text-green-500" />
-          5-Day Premium Trial
-        </CardTitle>
-        <CardDescription>
-          Try before you buy · Full premium access for 5 days
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <ul className="text-sm text-muted-foreground space-y-1">
-            <li>✅ 5 Chapters unlocked</li>
-            <li>✅ 3 Full Mock Tests</li>
-            <li>✅ Performance Analytics</li>
-            <li>✅ PYQs Access</li>
-          </ul>
-          <div className="text-center min-w-[140px]">
-            <div className="text-4xl font-bold text-foreground mb-2">₹29</div>
-            <p className="text-xs text-muted-foreground mb-2">One-time · 5 days</p>
-            <Button
-              className="bg-green-500 hover:bg-green-600 text-white border-0 w-full"
-              onClick={() => handleBuy("trial")}
-              disabled={loading && activePlanId === "trial"}
-            >
-              {loading && activePlanId === "trial"
-                ? "Processing..."
-                : "Start Trial — ₹29"}
-            </Button>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  </div>
-)}
+            <div className="max-w-4xl mx-auto mb-6">
+              <Card className="border-green-400 bg-green-50 dark:bg-green-950/20 relative">
+                <Badge className="absolute top-4 right-4 bg-green-500 text-white">New</Badge>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-xl flex items-center gap-2">
+                    <Shield className="h-5 w-5 text-green-500" />
+                    5-Day Premium Trial
+                  </CardTitle>
+                  <CardDescription>Try before you buy · Full premium access for 5 days</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                    <ul className="text-sm text-muted-foreground space-y-1">
+                      <li>✅ 5 Chapters unlocked</li>
+                      <li>✅ 3 Full Mock Tests</li>
+                      <li>✅ Performance Analytics</li>
+                      <li>✅ PYQs Access</li>
+                    </ul>
+                    <div className="text-center min-w-[140px]">
+                      <div className="text-4xl font-bold text-foreground mb-2">₹29</div>
+                      <p className="text-xs text-muted-foreground mb-2">One-time · 5 days</p>
+                      <Button
+                        className="bg-green-500 hover:bg-green-600 text-white border-0 w-full"
+                        onClick={() => handleBuy("trial")}
+                        disabled={loading && activePlanId === "trial"}
+                      >
+                        {loading && activePlanId === "trial" ? "Processing..." : "Start Trial — ₹29"}
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
 
-          {/* Monthly Plan */}
-          {!isPaid && (
+          {/* Monthly Plan — non-paid ya trial users */}
+          {(!isPaid || isTrialUser) && (
             <div className="max-w-4xl mx-auto mb-8">
-              <Card className="border-orange-400 bg-orange-50 dark:bg-orange-950/20 relative">
-                <Badge variant="destructive" className="absolute top-4 right-4">
-                  Limited Time Offer
-                </Badge>
+              <Card className={`border-orange-400 bg-orange-50 dark:bg-orange-950/20 relative ${
+                isCurrentPlan("monthly") ? "ring-2 ring-orange-400" : ""
+              }`}>
+                {isCurrentPlan("monthly") && (
+                  <Badge className="absolute top-4 left-4 bg-orange-500 text-white">Your Plan</Badge>
+                )}
+                <Badge variant="destructive" className="absolute top-4 right-4">Limited Time Offer</Badge>
                 <CardHeader className="pb-2">
                   <CardTitle className="text-xl flex items-center gap-2">
                     <Zap className="h-5 w-5 text-orange-500" />
                     NEET 30 Days Monthly Plan
                   </CardTitle>
-                  <CardDescription>Valid Till NEET Exam · Full access for 30 days</CardDescription>
+                  <CardDescription>Full access for 30 days</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -378,26 +419,24 @@ function PricingContent() {
                     <div className="text-center min-w-[140px]">
                       {getPromoForPlan("monthly") ? (
                         <div className="mb-2">
-                          <span className="text-2xl line-through text-muted-foreground">
-                            ₹{PRICING.monthly.price}
-                          </span>
-                          <span className="text-4xl font-bold text-foreground ml-2">
-                            ₹{getPromoForPlan("monthly")!.finalPrice}
-                          </span>
-                          <p className="text-xs text-green-600 mt-1">
-                            {getPromoForPlan("monthly")!.message}
-                          </p>
+                          <span className="text-2xl line-through text-muted-foreground">₹{PRICING.monthly.price}</span>
+                          <span className="text-4xl font-bold text-foreground ml-2">₹{getPromoForPlan("monthly")!.finalPrice}</span>
+                          <p className="text-xs text-green-600 mt-1">{getPromoForPlan("monthly")!.message}</p>
                         </div>
                       ) : (
                         <div className="text-4xl font-bold text-foreground mb-2">₹249</div>
                       )}
-                      <Button
-                        className="bg-orange-500 hover:bg-orange-600 text-white border-0 w-full"
-                        onClick={() => handleBuy("monthly")}
-                        disabled={loading && activePlanId === "monthly"}
-                      >
-                        {loading && activePlanId === "monthly" ? "Processing..." : "Buy Monthly Plan"}
-                      </Button>
+                      {isCurrentPlan("monthly") ? (
+                        <Button className="w-full" disabled>✅ Current Plan</Button>
+                      ) : (
+                        <Button
+                          className="bg-orange-500 hover:bg-orange-600 text-white border-0 w-full"
+                          onClick={() => handleBuy("monthly")}
+                          disabled={loading && activePlanId === "monthly"}
+                        >
+                          {loading && activePlanId === "monthly" ? "Processing..." : "Buy Monthly Plan"}
+                        </Button>
+                      )}
                     </div>
                   </div>
                 </CardContent>
@@ -405,45 +444,45 @@ function PricingContent() {
             </div>
           )}
 
-          {/* Free + Yearly Plans */}
-          <div className={`max-w-4xl mx-auto mb-8 ${isPaid ? "" : "grid grid-cols-1 md:grid-cols-2 gap-8"}`}>
-            {!isPaid && (
+          {/* Free + Yearly — always show, but update button based on plan */}
+          <div className={`max-w-4xl mx-auto mb-8 ${(isPaid && !isTrialUser) ? "" : "grid grid-cols-1 md:grid-cols-2 gap-8"}`}>
+            {(!isPaid || isTrialUser) && (
               <PricingCard
                 plan="free"
                 features={allFeatures.map((f) => ({ name: f.name, included: f.free }))}
-                userIsPaid={isPaid}
+                userIsPaid={false}
                 userLoggedIn={!!user}
               />
             )}
             <PricingCard
               plan="premium"
               features={allFeatures.map((f) => ({ name: f.name, included: f.paid }))}
-              userIsPaid={isPaid}
+              userIsPaid={isCurrentPlan("premium")}
               userLoggedIn={!!user}
               onBuy={handleBuy}
               promoResult={getPromoForPlan("premium")}
+              currentPlanLabel={isCurrentPlan("premium") ? "Your Plan" : undefined}
             />
           </div>
 
           {/* 6 Month Plan */}
-          {!isPaid && (
+          {(!isPaid || isTrialUser) && (
             <div className="max-w-sm mx-auto mb-16">
               <PricingCard
                 plan="sixMonth"
                 features={allFeatures.map((f) => ({ name: f.name, included: f.paid }))}
-                userIsPaid={isPaid}
+                userIsPaid={isCurrentPlan("sixMonth")}
                 userLoggedIn={!!user}
                 onBuy={handleBuy}
                 promoResult={getPromoForPlan("sixMonth")}
+                currentPlanLabel={isCurrentPlan("sixMonth") ? "Your Plan" : undefined}
               />
             </div>
           )}
 
-          {/* Features Section */}
+          {/* Features */}
           <div className="mb-16">
-            <h2 className="text-2xl font-bold text-foreground text-center mb-8">
-              What You Get with Premium
-            </h2>
+            <h2 className="text-2xl font-bold text-foreground text-center mb-8">What You Get with Premium</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               <Card className="border-border"><CardContent className="pt-6"><BookOpen className="h-10 w-10 text-primary mb-4" /><h3 className="font-semibold text-foreground mb-2">38 Complete Chapters</h3><p className="text-sm text-muted-foreground">Full access to Class 11 and Class 12 NCERT Biology chapters</p></CardContent></Card>
               <Card className="border-border"><CardContent className="pt-6"><FileText className="h-10 w-10 text-primary mb-4" /><h3 className="font-semibold text-foreground mb-2">3800+ MCQs</h3><p className="text-sm text-muted-foreground">100 questions per chapter with detailed NCERT-based explanations</p></CardContent></Card>
@@ -456,14 +495,12 @@ function PricingContent() {
 
           {/* FAQ */}
           <div className="max-w-2xl mx-auto">
-            <h2 className="text-2xl font-bold text-foreground text-center mb-8">
-              Frequently Asked Questions
-            </h2>
+            <h2 className="text-2xl font-bold text-foreground text-center mb-8">Frequently Asked Questions</h2>
             <div className="space-y-4">
               <Card className="border-border"><CardContent className="pt-6"><h3 className="font-semibold text-foreground mb-2">Can I cancel my subscription anytime?</h3><p className="text-sm text-muted-foreground">Yes, you can cancel your subscription at any time. Your access will continue until the end of your billing period.</p></CardContent></Card>
               <Card className="border-border"><CardContent className="pt-6"><h3 className="font-semibold text-foreground mb-2">Is the content based on NCERT?</h3><p className="text-sm text-muted-foreground">Yes, all questions and explanations are strictly based on NCERT Biology textbooks and NEET exam patterns.</p></CardContent></Card>
               <Card className="border-border"><CardContent className="pt-6"><h3 className="font-semibold text-foreground mb-2">What payment methods are accepted?</h3><p className="text-sm text-muted-foreground">We accept UPI, debit cards, credit cards, and net banking through our secure payment gateway.</p></CardContent></Card>
-              <Card className="border-border"><CardContent className="pt-6"><h3 className="font-semibold text-foreground mb-2">What is the Monthly Pack?</h3><p className="text-sm text-muted-foreground">The Monthly Pack gives you 30 days of full access to all features — perfect for last-minute NEET preparation at just ₹249.</p></CardContent></Card>
+              <Card className="border-border"><CardContent className="pt-6"><h3 className="font-semibold text-foreground mb-2">What is the Trial Pack?</h3><p className="text-sm text-muted-foreground">The 5-Day Trial gives you access to 5 chapters and 3 mock tests for just ₹29 — perfect for trying before buying.</p></CardContent></Card>
               <Card className="border-border"><CardContent className="pt-6"><h3 className="font-semibold text-foreground mb-2">Do you have promo codes?</h3><p className="text-sm text-muted-foreground">Yes! Follow our social media or ask your coaching partner for exclusive promo codes and get instant discounts.</p></CardContent></Card>
             </div>
           </div>

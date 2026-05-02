@@ -15,12 +15,13 @@ type PromoResult = {
 };
 
 type PricingCardProps = {
-  plan: "free" | "crash" | "sixMonth" | "premium";
+  plan: "free" | "monthly" | "sixMonth" | "premium";
   features: Array<{ name: string; included: boolean | string }>;
   userIsPaid?: boolean;
   userLoggedIn?: boolean;
   onBuy?: (planId: string) => void;
   promoResult?: PromoResult;
+  currentPlanLabel?: string; // "Your Plan" dikhane ke liye
 };
 
 export function PricingCard({
@@ -30,16 +31,16 @@ export function PricingCard({
   userLoggedIn,
   onBuy,
   promoResult,
+  currentPlanLabel,
 }: PricingCardProps) {
   const isPremiumPlan = plan === "premium";
-  const isCrash = plan === "crash";
+  const isMonthly = plan === "monthly";
   const isSixMonth = plan === "sixMonth";
   const isFree = plan === "free";
 
   const planData = isFree ? null : PRICING[plan as keyof typeof PRICING];
   const basePrice = planData?.price || 0;
 
-  // Promo valid for this specific plan
   const promoValid = promoResult && promoResult.discountAmount > 0;
   const displayPrice = promoValid ? promoResult!.finalPrice : basePrice;
 
@@ -47,24 +48,24 @@ export function PricingCard({
     ? "/forever"
     : isPremiumPlan
     ? PRICING.premium.label
-    : isCrash
-    ? PRICING.crash.label
+    : isMonthly
+    ? (PRICING as any).monthly?.label || "Monthly"
     : PRICING.sixMonth.label;
 
   const description = isFree
     ? "Try before you commit"
     : isPremiumPlan
     ? PRICING.premium.description
-    : isCrash
-    ? PRICING.crash.description
+    : isMonthly
+    ? (PRICING as any).monthly?.description || "Monthly Plan"
     : PRICING.sixMonth.description;
 
   const title = isFree
     ? "Free"
     : isPremiumPlan
     ? "Yearly Plan"
-    : isCrash
-    ? "Crash Pack"
+    : isMonthly
+    ? "Monthly Plan"
     : "6 Month Plan";
 
   return (
@@ -72,15 +73,20 @@ export function PricingCard({
       className={`relative ${
         isPremiumPlan
           ? "border-primary shadow-lg"
-          : isCrash
+          : isMonthly
           ? "border-orange-400 shadow-md"
           : "border-border"
-      }`}
+      } ${currentPlanLabel ? "ring-2 ring-primary" : ""}`}
     >
-      {isPremiumPlan && (
+      {isPremiumPlan && !currentPlanLabel && (
         <Badge className="absolute -top-3 left-1/2 -translate-x-1/2">Most Popular</Badge>
       )}
-      {isCrash && (
+      {currentPlanLabel && (
+        <Badge className="absolute -top-3 left-1/2 -translate-x-1/2 bg-green-500 text-white">
+          ✅ {currentPlanLabel}
+        </Badge>
+      )}
+      {isMonthly && (
         <Badge className="absolute -top-3 left-1/2 -translate-x-1/2" variant="destructive">
           Limited Time Offer
         </Badge>
@@ -91,7 +97,6 @@ export function PricingCard({
         <CardDescription>{description}</CardDescription>
 
         <div className="mt-4">
-          {/* Yearly original price strikethrough — no promo */}
           {isPremiumPlan && !promoValid && (
             <div className="flex items-center justify-center gap-2 mb-1">
               <span className="text-lg text-muted-foreground line-through">
@@ -103,7 +108,6 @@ export function PricingCard({
             </div>
           )}
 
-          {/* Promo applied — show original strikethrough + discount badge */}
           {promoValid && (
             <div className="flex items-center justify-center gap-2 mb-1">
               <span className="text-lg text-muted-foreground line-through">₹{basePrice}</span>
@@ -120,7 +124,7 @@ export function PricingCard({
           )}
           <span className="block text-sm text-muted-foreground mt-1">{periodLabel}</span>
 
-          {isCrash && (
+          {isMonthly && (
             <span className="block text-xs text-orange-600 font-medium mt-1">
               Valid Till NEET Exam
             </span>
@@ -155,17 +159,17 @@ export function PricingCard({
             </Button>
           )
         ) : userIsPaid ? (
-          <Button className="w-full" disabled>
-            Already Subscribed
+          <Button className="w-full" disabled variant="outline">
+            ✅ Current Plan
           </Button>
         ) : (
           <Button
-            className={`w-full ${isCrash ? "bg-orange-500 hover:bg-orange-600 text-white border-0" : ""}`}
+            className={`w-full ${isMonthly ? "bg-orange-500 hover:bg-orange-600 text-white border-0" : ""}`}
             variant={isPremiumPlan ? "default" : "outline"}
             onClick={() => onBuy?.(plan)}
           >
-            {isCrash
-              ? `Buy Crash Pack — ₹${displayPrice}`
+            {isMonthly
+              ? `Buy Monthly Pack — ₹${displayPrice}`
               : isPremiumPlan
               ? `Buy Yearly — ₹${displayPrice}`
               : `Buy 6 Months — ₹${displayPrice}`}

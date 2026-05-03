@@ -5,7 +5,14 @@ export default function robots(): MetadataRoute.Robots {
     rules: {
       userAgent: "*",
       allow: "/",
-      disallow: ["/admin", "/dashboard", "/api/"],
+      disallow: [
+        "/admin",
+        "/dashboard",
+        "/results",
+        "/login",
+        "/signup",
+        "/api/",
+      ],
     },
     sitemap: "https://master360.vercel.app/sitemap.xml",
   };

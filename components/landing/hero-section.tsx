@@ -26,7 +26,7 @@ export function HeroSection() {
       <div className="container mx-auto px-4">
         <div className="mx-auto max-w-4xl text-center">
           <h1 className="text-4xl font-bold tracking-tight text-foreground sm:text-5xl lg:text-6xl text-balance">
-            Crack NEET Biology with <span className="text-primary">NCERT + PYQs</span> + Mock Tests
+           Crack <span className="text-primary" style={{ textTransform: "uppercase", letterSpacing: "0.01em" }}>Neet Biology</span> with NCERT + PYQs + Mock Tests
           </h1>
           
           <p className="mt-6 text-lg text-muted-foreground max-w-2xl mx-auto leading-relaxed text-pretty">

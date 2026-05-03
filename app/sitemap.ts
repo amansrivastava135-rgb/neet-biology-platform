@@ -2,44 +2,31 @@ import { MetadataRoute } from "next";
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const baseUrl = "https://master360.vercel.app";
-  const now = new Date().toISOString();
 
   return [
     {
       url: baseUrl,
-      lastModified: now,
+      lastModified: new Date("2025-01-01"),
       changeFrequency: "monthly",
       priority: 1,
     },
     {
       url: `${baseUrl}/practice`,
-      lastModified: now,
-      changeFrequency: "weekly",
+      lastModified: new Date("2025-01-01"),
+      changeFrequency: "monthly",
       priority: 0.9,
     },
     {
       url: `${baseUrl}/mock-test`,
-      lastModified: now,
-      changeFrequency: "weekly",
+      lastModified: new Date("2025-01-01"),
+      changeFrequency: "monthly",
       priority: 0.9,
     },
     {
       url: `${baseUrl}/pricing`,
-      lastModified: now,
+      lastModified: new Date("2025-01-01"),
       changeFrequency: "monthly",
       priority: 0.8,
-    },
-    {
-      url: `${baseUrl}/login`,
-      lastModified: now,
-      changeFrequency: "yearly",
-      priority: 0.5,
-    },
-    {
-      url: `${baseUrl}/signup`,
-      lastModified: now,
-      changeFrequency: "yearly",
-      priority: 0.5,
     },
   ];
 }

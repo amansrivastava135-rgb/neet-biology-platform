@@ -5,13 +5,14 @@ import { HeroSection } from "@/components/landing/hero-section";
 import { FeaturesSection } from "@/components/landing/features-section";
 import { ChaptersPreview } from "@/components/landing/chapters-preview";
 import { AboutSection } from "@/components/landing/about-section";
+import { PricingPreview } from "@/components/landing/pricing-preview";
 import { CTASection } from "@/components/landing/cta-section";
 import { AuthProvider } from "@/lib/auth-context";
 
 export const metadata: Metadata = {
   title: "MASTER360 – NEET Biology Mock Tests, MCQs & PYQs Platform",
   description:
-    "MASTER360 is a complete NEET Biology preparation platform with 3800+ MCQs, chapter-wise practice, PYQs (2010-2024), full mock tests, and detailed performance analytics.",
+    "MASTER360 is a complete NEET Biology preparation platform with 3800+ MCQs, chapter-wise practice, PYQs (2010-2025), full mock tests, and detailed performance analytics.",
   openGraph: {
     title: "MASTER360 – NEET Biology Mock Tests, MCQs & PYQs Platform",
     description:
@@ -33,6 +34,7 @@ export default function HomePage() {
           <HeroSection />
           <FeaturesSection />
           <ChaptersPreview />
+          <PricingPreview />
           <AboutSection />
           <CTASection />
         </main>

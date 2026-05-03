@@ -10,7 +10,7 @@ const features = [
   {
     icon: FileQuestion,
     title: "NEET PYQs Included",
-    description: "Access previous year questions from 2010-2024 with detailed explanations referencing NCERT concepts.",
+    description: "Access previous year questions from 2010-2025 with detailed explanations referencing NCERT concepts.",
   },
   {
     icon: CheckCircle,
@@ -20,7 +20,7 @@ const features = [
   {
     icon: Clock,
     title: "Full Mock Tests",
-    description: "NEET-pattern mock tests with 180 questions, 3-hour timer, and automatic score calculation.",
+    description: "NEET-pattern Biologymock tests with 90 questions, 1.5-hour timer, and automatic score calculation.",
   },
   {
     icon: BarChart3,

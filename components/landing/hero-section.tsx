@@ -26,12 +26,12 @@ export function HeroSection() {
       <div className="container mx-auto px-4">
         <div className="mx-auto max-w-4xl text-center">
           <h1 className="text-4xl font-bold tracking-tight text-foreground sm:text-5xl lg:text-6xl text-balance">
-            Master <span className="text-primary">NCERT Biology</span> for NEET
+            Crack NEET Biology with <span className="text-primary">NCERT + PYQs</span> + Mock Tests
           </h1>
           
           <p className="mt-6 text-lg text-muted-foreground max-w-2xl mx-auto leading-relaxed text-pretty">
-            Structured chapter-wise practice with 3800+ MCQs, Previous Year Questions, 
-            full-length mock tests, and detailed performance analytics to ace your NEET Biology.
+            Structured chapter-wise practice with 3800+ MCQs, Previous Year Questions (2010–2025), 
+            full-length mock tests, and performance analytics.
           </p>
 
           <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
@@ -45,13 +45,13 @@ export function HeroSection() {
             ) : (
               <>
                 <Button size="lg" asChild className="gap-2 w-full sm:w-auto">
-                  <Link href="/practice?demo=true">
-                    Try Demo Questions
+                  <Link href="/signup">
+                    Start Practicing Free
                     <ArrowRight className="h-4 w-4" />
                   </Link>
                 </Button>
                 <Button size="lg" variant="outline" asChild className="w-full sm:w-auto">
-                  <Link href="/signup">Create Free Account</Link>
+                  <Link href="/practice">Explore Chapters</Link>
                 </Button>
               </>
             )}
@@ -76,8 +76,8 @@ export function HeroSection() {
             </div>
             <div className="rounded-xl border border-border bg-card p-4">
               <TrendingUp className="h-6 w-6 text-primary mx-auto mb-2" />
-              <p className="text-2xl font-bold text-foreground">95%</p>
-              <p className="text-sm text-muted-foreground">Success Rate</p>
+              <p className="text-2xl font-bold text-foreground">2010–2025</p>
+              <p className="text-sm text-muted-foreground">PYQs Coverage</p>
             </div>
           </div>
         </div>

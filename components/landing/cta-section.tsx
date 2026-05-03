@@ -10,7 +10,7 @@ export function CTASection() {
           Ready to Master NEET Biology?
         </h2>
         <p className="mt-4 text-lg text-primary-foreground/80 max-w-2xl mx-auto text-pretty">
-          Join thousands of successful NEET aspirants. Start your structured preparation today 
+          Start your structured NEET Biology preparation today
           with chapter-wise practice and comprehensive mock tests.
         </p>
         <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4">

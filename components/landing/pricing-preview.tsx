@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Check, X, Zap } from "lucide-react";
+import { Check, X } from "lucide-react";
 import { PRICING } from "@/lib/pricing-config";
 
 const freePlanFeatures = [
@@ -34,44 +34,6 @@ export function PricingPreview() {
           <p className="mt-4 text-lg text-muted-foreground max-w-2xl mx-auto">
             Get complete access to all features for less than the cost of a coffee per day
           </p>
-        </div>
-
-        {/* Crash Pack Banner */}
-        <div className="max-w-4xl mx-auto mb-8">
-          <Card className="border-orange-400 bg-orange-50 dark:bg-orange-950/20 relative overflow-hidden">
-            <Badge
-              variant="destructive"
-              className="absolute top-4 right-4"
-            >
-              Limited Time Offer
-            </Badge>
-            <CardContent className="py-6">
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-                <div className="flex items-center gap-4">
-                  <div className="h-12 w-12 rounded-full bg-orange-100 dark:bg-orange-900/40 flex items-center justify-center">
-                    <Zap className="h-6 w-6 text-orange-500" />
-                  </div>
-                  <div>
-                    <h3 className="font-bold text-foreground text-lg">
-                      NEET Final 30 Days Crash Pack
-                    </h3>
-                    <p className="text-sm text-muted-foreground">
-                      Valid Till NEET Exam · Full access for 30 days
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-4">
-                  <span className="text-3xl font-bold text-foreground">₹299</span>
-                  <Button
-                    className="bg-orange-500 hover:bg-orange-600 text-white border-0"
-                    asChild
-                  >
-                    <Link href="/pricing">Buy Now</Link>
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
         </div>
 
         {/* Free + Premium cards */}

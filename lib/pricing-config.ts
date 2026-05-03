@@ -20,7 +20,7 @@ export const PRICING = {
     currency: "INR",
     durationDays: 30,
     label: "30 Days Access",
-    description: "NEET 30 Days Crash Pack",
+    description: "NEET Biology 30 Days Plan",
     displayText: "30 days intensive preparation",
   },
   sixMonth: {

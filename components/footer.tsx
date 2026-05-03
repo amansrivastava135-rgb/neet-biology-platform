@@ -112,7 +112,7 @@ export function Footer() {
           <p>
             &copy; {new Date().getFullYear()}{" "}
             <strong className="text-sidebar-foreground/80">MASTER360</strong>{" "}
-            – NEET Biology Preparation Platform by Dr. Amankumar Srivastav Pvt Tutorials. All rights reserved.
+            – NEET Biology Preparation Platform by Dr. Amankumar Srivastav. All rights reserved.
           </p>
         </div>
       </div>

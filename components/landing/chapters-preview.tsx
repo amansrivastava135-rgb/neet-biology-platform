@@ -18,7 +18,7 @@ export function ChaptersPreview() {
             Complete NCERT Biology Syllabus
           </h2>
           <p className="mt-4 text-lg text-muted-foreground max-w-2xl mx-auto">
-            All 38 chapters from Class 11 and 12 Biology with 100 MCQs each
+            All 38 chapters from Class 11 and 12 Biology with 100+ MCQs each
           </p>
         </div>
 

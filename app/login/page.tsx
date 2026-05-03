@@ -111,8 +111,8 @@ function LoginForm() {
               <BookOpen className="h-6 w-6 text-primary-foreground" />
             </div>
             <div className="text-left">
-              <p className="text-sm font-bold text-foreground leading-tight">Dr. Amankumar Srivastav</p>
-              <p className="text-xs text-muted-foreground">Pvt Tutorials</p>
+              <p className="text-sm font-bold text-foreground leading-tight">MASTER360</p>
+              <p className="text-xs text-muted-foreground">Dr. Amankumar Srivastav</p>
             </div>
           </Link>
         </div>
@@ -174,22 +174,22 @@ function LoginForm() {
                   />
                 </div>
                 <div className="space-y-2">
-  <div className="flex items-center justify-between">
-    <Label htmlFor="password">Password</Label>
-    <Link href="/forgot-password" className="text-xs text-primary hover:underline">
-      Forgot Password?
-    </Link>
-  </div>
-  <Input
-    id="password"
-    type="password"
-    placeholder="Enter your password"
-    value={password}
-    onChange={(e) => setPassword(e.target.value)}
-    required
-    disabled={isLoading}
-  />
-</div>
+                  <div className="flex items-center justify-between">
+                  <Label htmlFor="password">Password</Label>
+                  <Link href="/forgot-password" className="text-xs text-primary hover:underline">
+                    Forgot Password?
+                  </Link>
+                  </div>
+                 <Input
+                   id="password"
+                   type="password"
+                   placeholder="Enter your password"
+                   value={password}
+                   onChange={(e) => setPassword(e.target.value)}
+                   required
+                   disabled={isLoading}
+                  />
+                </div>
                 <Button type="submit" className="w-full" disabled={isLoading}>
                   {isLoading ? (
                     <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Signing in...</>

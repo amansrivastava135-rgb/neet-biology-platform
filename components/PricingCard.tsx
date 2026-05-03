@@ -49,7 +49,7 @@ export function PricingCard({
     : isPremiumPlan
     ? PRICING.premium.label
     : isMonthly
-    ? (PRICING as any).monthly?.label || "Monthly"
+    ? PRICING.monthly.label
     : PRICING.sixMonth.label;
 
   const description = isFree
@@ -57,7 +57,7 @@ export function PricingCard({
     : isPremiumPlan
     ? PRICING.premium.description
     : isMonthly
-    ? (PRICING as any).monthly?.description || "Monthly Plan"
+    ? PRICING.monthly.description
     : PRICING.sixMonth.description;
 
   const title = isFree
@@ -86,12 +86,7 @@ export function PricingCard({
           ✅ {currentPlanLabel}
         </Badge>
       )}
-      {isMonthly && (
-        <Badge className="absolute -top-3 left-1/2 -translate-x-1/2" variant="destructive">
-          Limited Time Offer
-        </Badge>
-      )}
-
+      
       <CardHeader className="text-center pb-4">
         <CardTitle className="text-2xl">{title}</CardTitle>
         <CardDescription>{description}</CardDescription>
@@ -123,12 +118,6 @@ export function PricingCard({
             <span className="text-4xl font-bold text-foreground">₹{displayPrice}</span>
           )}
           <span className="block text-sm text-muted-foreground mt-1">{periodLabel}</span>
-
-          {isMonthly && (
-            <span className="block text-xs text-orange-600 font-medium mt-1">
-              Valid Till NEET Exam
-            </span>
-          )}
         </div>
       </CardHeader>
 

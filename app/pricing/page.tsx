@@ -400,11 +400,10 @@ function PricingContent() {
                 {isCurrentPlan("monthly") && (
                   <Badge className="absolute top-4 left-4 bg-orange-500 text-white">Your Plan</Badge>
                 )}
-                <Badge variant="destructive" className="absolute top-4 right-4">Limited Time Offer</Badge>
                 <CardHeader className="pb-2">
                   <CardTitle className="text-xl flex items-center gap-2">
                     <Zap className="h-5 w-5 text-orange-500" />
-                    NEET 30 Days Monthly Plan
+                    30 Days Full Access
                   </CardTitle>
                   <CardDescription>Full access for 30 days</CardDescription>
                 </CardHeader>

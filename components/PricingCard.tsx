@@ -21,7 +21,7 @@ type PricingCardProps = {
   userLoggedIn?: boolean;
   onBuy?: (planId: string) => void;
   promoResult?: PromoResult;
-  currentPlanLabel?: string; // "Your Plan" dikhane ke liye
+  currentPlanLabel?: string;
 };
 
 export function PricingCard({
@@ -86,7 +86,7 @@ export function PricingCard({
           ✅ {currentPlanLabel}
         </Badge>
       )}
-      
+
       <CardHeader className="text-center pb-4">
         <CardTitle className="text-2xl">{title}</CardTitle>
         <CardDescription>{description}</CardDescription>
@@ -118,6 +118,13 @@ export function PricingCard({
             <span className="text-4xl font-bold text-foreground">₹{displayPrice}</span>
           )}
           <span className="block text-sm text-muted-foreground mt-1">{periodLabel}</span>
+
+          {/* Per-day value — only yearly, no promo active */}
+          {isPremiumPlan && !promoValid && (
+            <p className="text-xs text-green-600 font-medium mt-1">
+              = Just ₹2.7/day for complete NEET Biology prep
+            </p>
+          )}
         </div>
       </CardHeader>
 
@@ -152,17 +159,24 @@ export function PricingCard({
             ✅ Current Plan
           </Button>
         ) : (
-          <Button
-            className={`w-full ${isMonthly ? "bg-orange-500 hover:bg-orange-600 text-white border-0" : ""}`}
-            variant={isPremiumPlan ? "default" : "outline"}
-            onClick={() => onBuy?.(plan)}
-          >
-            {isMonthly
-              ? `Buy Monthly Pack — ₹${displayPrice}`
-              : isPremiumPlan
-              ? `Buy Yearly — ₹${displayPrice}`
-              : `Buy 6 Months — ₹${displayPrice}`}
-          </Button>
+          <>
+            <Button
+              className={`w-full ${isMonthly ? "bg-orange-500 hover:bg-orange-600 text-white border-0" : ""}`}
+              variant={isPremiumPlan ? "default" : "outline"}
+              onClick={() => onBuy?.(plan)}
+            >
+              {isMonthly
+                ? `Buy Monthly Pack — ₹${displayPrice}`
+                : isPremiumPlan
+                ? `Buy Yearly — ₹${displayPrice}`
+                : `Buy 6 Months — ₹${displayPrice}`}
+            </Button>
+            {isPremiumPlan && (
+              <p className="text-xs text-center text-muted-foreground mt-2">
+                🔒 Instant access after payment
+              </p>
+            )}
+          </>
         )}
       </CardContent>
     </Card>

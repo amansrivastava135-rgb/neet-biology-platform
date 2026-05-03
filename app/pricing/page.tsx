@@ -26,16 +26,6 @@ const allFeatures = [
   { name: "Weak Chapter Analysis", free: false, paid: true },
 ];
 
-const trialFeatures = [
-  { name: "10 Demo Questions", included: true },
-  { name: "Mock Test Preview", included: true },
-  { name: "5 Chapters Unlocked", included: true },
-  { name: "3 Full Mock Tests", included: true },
-  { name: "Basic Analytics", included: true },
-  { name: "All 38 Chapters", included: false },
-  { name: "Unlimited Mock Tests", included: false },
-];
-
 type PromoResult = {
   code: string;
   discountAmount: number;
@@ -52,7 +42,6 @@ type PromoState = {
   results: Record<string, PromoResult>;
 };
 
-// Plan label helper
 function getPlanLabel(planId?: string): string {
   switch (planId) {
     case "trial": return "5-Day Trial";
@@ -130,7 +119,6 @@ function PricingContent() {
     const paidPlans = ["monthly", "sixMonth", "premium"];
     const results: Record<string, PromoResult> = {};
     let anyValid = false;
-    let lastMessage = "This code is not applicable for any plan";
 
     await Promise.all(
       paidPlans.map(async (planId) => {
@@ -151,13 +139,13 @@ function PricingContent() {
               message: res.message,
               planId,
             };
-            lastMessage = res.message;
           }
         } catch {}
       })
     );
 
     if (anyValid) {
+      const lastMessage = Object.values(results)[0]?.message || "Discount applied";
       setPromo((p) => ({ ...p, status: "valid", message: lastMessage, results }));
     } else {
       try {
@@ -233,16 +221,14 @@ function PricingContent() {
           }).then((r) => r.json());
 
           if (verifyRes.success) {
-            // updateUser se sahi plan localStorage mein save hoga
             const updatedUser = {
               ...user,
               ...verifyRes.user,
               isPaid: true,
-              subscriptionPlan: planId as any, // exact planId save karo
+              subscriptionPlan: planId as any,
               plan: planId,
             };
             await updateUser(updatedUser);
-            // activateSubscription mein planId pass karo — "NEET Test Series" nahi
             await activateSubscription(planId, planData.durationDays);
             router.push("/dashboard");
           } else {
@@ -269,7 +255,6 @@ function PricingContent() {
     return promo.results[planId];
   };
 
-  // Check if specific plan is current plan
   const isCurrentPlan = (planId: string) => {
     return isPaid && (currentPlanId === planId);
   };
@@ -290,6 +275,12 @@ function PricingContent() {
               Get unlimited access to all NEET Biology preparation resources for less than
               the cost of a single coaching class.
             </p>
+            {/* Social proof */}
+            <p className="text-sm text-muted-foreground mt-3">
+              Trusted by{" "}
+              <span className="text-foreground font-semibold">100+</span>{" "}
+              NEET aspirants across India
+            </p>
           </div>
 
           {/* Current Subscription Banner */}
@@ -302,7 +293,7 @@ function PricingContent() {
             </div>
           )}
 
-          {/* Promo Code — sirf non-paid ya trial users ko dikhao */}
+          {/* Promo Code */}
           {(!isPaid || isTrialUser) && (
             <div className="max-w-4xl mx-auto mb-8" id="plans">
               <Card className="border-border">
@@ -354,7 +345,7 @@ function PricingContent() {
             </div>
           )}
 
-          {/* Trial Card — sirf non-paid users ko dikhao */}
+          {/* Trial Card */}
           {!isPaid && (
             <div className="max-w-4xl mx-auto mb-6">
               <Card className="border-green-400 bg-green-50 dark:bg-green-950/20 relative">
@@ -364,7 +355,9 @@ function PricingContent() {
                     <Shield className="h-5 w-5 text-green-500" />
                     5-Day Premium Trial
                   </CardTitle>
-                  <CardDescription>Try before you buy · Full premium access for 5 days</CardDescription>
+                  <CardDescription>
+                    Risk-free · Instant access to 5 chapters + 3 mock tests
+                  </CardDescription>
                 </CardHeader>
                 <CardContent>
                   <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -391,7 +384,7 @@ function PricingContent() {
             </div>
           )}
 
-          {/* Monthly Plan — non-paid ya trial users */}
+          {/* Monthly Plan */}
           {(!isPaid || isTrialUser) && (
             <div className="max-w-4xl mx-auto mb-8">
               <Card className={`border-orange-400 bg-orange-50 dark:bg-orange-950/20 relative ${
@@ -443,7 +436,7 @@ function PricingContent() {
             </div>
           )}
 
-          {/* Free + Yearly — always show, but update button based on plan */}
+          {/* Free + Yearly */}
           <div className={`max-w-4xl mx-auto mb-8 ${(isPaid && !isTrialUser) ? "" : "grid grid-cols-1 md:grid-cols-2 gap-8"}`}>
             {(!isPaid || isTrialUser) && (
               <PricingCard
@@ -466,7 +459,7 @@ function PricingContent() {
 
           {/* 6 Month Plan */}
           {(!isPaid || isTrialUser) && (
-            <div className="max-w-sm mx-auto mb-16">
+            <div className="max-w-md mx-auto mb-6">
               <PricingCard
                 plan="sixMonth"
                 features={allFeatures.map((f) => ({ name: f.name, included: f.paid }))}
@@ -478,6 +471,15 @@ function PricingContent() {
               />
             </div>
           )}
+
+          {/* Payment trust line */}
+          <p className="text-center text-xs text-muted-foreground mt-2 mb-16">
+            <span>🔒 Secure payments via Razorpay</span>
+            <span className="mx-2">·</span>
+            <span>UPI, Cards, Net Banking accepted</span>
+            <span className="mx-2">·</span>
+            <span>Instant access after payment</span>
+          </p>
 
           {/* Features */}
           <div className="mb-16">

@@ -28,7 +28,7 @@ type SetInfo = {
 async function getSetsForChapter(chapterId: number): Promise<SetInfo[]> {
   try {
     const res = await fetch(`/api/questions?chapterId=${chapterId}`, {
-      credentials: "include", // ← cookie attach hogi
+      credentials: "include",
     });
     if (!res.ok) return [];
     const data = await res.json();
@@ -42,7 +42,7 @@ async function getSetsForChapter(chapterId: number): Promise<SetInfo[]> {
 async function getChapterQuestionCount(chapterId: number): Promise<number> {
   try {
     const res = await fetch(`/api/questions/count?chapterId=${chapterId}`, {
-      credentials: "include", // ← cookie attach hogi
+      credentials: "include",
     });
     if (!res.ok) return 0;
     const data = await res.json();
@@ -55,7 +55,7 @@ async function getChapterQuestionCount(chapterId: number): Promise<number> {
 async function fetchPYQData() {
   try {
     const res = await fetch(`/api/questions?source=PYQ`, {
-      credentials: "include", // ← cookie attach hogi
+      credentials: "include",
     });
     if (!res.ok) return [];
     const data = await res.json();
@@ -279,12 +279,20 @@ function ChapterCard({
     getChapterQuestionCount(chapter.id).then(setQuestionCount);
   }, [chapter.id]);
 
+  const handleClick = () => {
+    if (isUnlocked) {
+      onClick();
+    } else if (isTrial) {
+      window.location.href = "/pricing?ref=chapter-limit";
+    }
+  };
+
   return (
     <Card
       className={`border-border hover:border-primary/50 transition-colors cursor-pointer ${
         !isUnlocked ? "opacity-75" : ""
       }`}
-      onClick={() => isUnlocked && onClick()}
+      onClick={handleClick}
     >
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between">
@@ -314,15 +322,18 @@ function ChapterCard({
         <Button
           className="w-full mt-4"
           variant={isUnlocked ? "default" : "secondary"}
-          disabled={!isUnlocked}
           onClick={(e) => {
             e.stopPropagation();
-            isUnlocked && onClick();
+            handleClick();
           }}
         >
           {isUnlocked ? (
             <><Play className="h-4 w-4 mr-2" />Select Set</>
-          ) : isTrial ? "Upgrade to Unlock" : "Unlock Premium"}
+          ) : isTrial ? (
+            <><Lock className="h-4 w-4 mr-2" />Upgrade to Unlock All 38 Chapters</>
+          ) : (
+            <><Lock className="h-4 w-4 mr-2" />Unlock Premium</>
+          )}
         </Button>
       </CardContent>
     </Card>
@@ -342,7 +353,6 @@ export function ChapterSelector({
   const [sets, setSets] = useState<SetInfo[]>([]);
   const [setsLoading, setSetsLoading] = useState(false);
 
-  // Trial: Class 11 se pehle 3, Class 12 se pehle 2 = total 5
   const TRIAL_CLASS11_LIMIT = 3;
   const TRIAL_CLASS12_LIMIT = 2;
 
@@ -522,10 +532,10 @@ export function ChapterSelector({
           {isTrial ? (
             <>
               <p className="text-foreground font-medium mb-2">
-                Trial: {TRIAL_MAX_CHAPTERS} of 38 chapters unlocked
+                You've unlocked {TRIAL_MAX_CHAPTERS} of 38 chapters
               </p>
               <p className="text-muted-foreground text-sm mb-4">
-                Upgrade to Premium for all 38 chapters + unlimited mock tests
+                Upgrade now to unlock all 38 chapters, 3800+ MCQs, and unlimited mock tests — starting at ₹249
               </p>
             </>
           ) : (

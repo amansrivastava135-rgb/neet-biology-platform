@@ -45,7 +45,6 @@ export function MockTestSelector({ onStartTest, isPaidUser, isTrial = false }: M
     fetchMockTests();
   }, []);
 
-  // Trial users ke liye sirf pehle 3 tests
   const visibleTests = isTrial ? mockTests.slice(0, TRIAL_MAX_MOCK_TESTS) : mockTests;
 
   return (
@@ -75,10 +74,10 @@ export function MockTestSelector({ onStartTest, isPaidUser, isTrial = false }: M
         <div className="max-w-4xl mx-auto mb-6 p-4 bg-amber-50 border border-amber-200 rounded-lg flex items-center justify-between gap-4">
           <div>
             <p className="text-sm font-semibold text-amber-900">
-              Trial: Up to {TRIAL_MAX_MOCK_TESTS} mock tests available
+              Trial: {TRIAL_MAX_MOCK_TESTS} of {isLoading ? "..." : mockTests.length} mock tests unlocked
             </p>
             <p className="text-xs text-amber-700 mt-0.5">
-              Upgrade to Premium for unlimited mock tests
+              Upgrade to unlock all {isLoading ? "" : mockTests.length} tests + unlimited retakes — starting at ₹249
             </p>
           </div>
           <Button size="sm" asChild className="shrink-0">
@@ -180,7 +179,7 @@ export function MockTestSelector({ onStartTest, isPaidUser, isTrial = false }: M
                 </Card>
               ))}
 
-              {/* Trial: locked remaining tests dikhao */}
+              {/* Trial: locked remaining tests */}
               {isTrial && mockTests.length > TRIAL_MAX_MOCK_TESTS &&
                 mockTests.slice(TRIAL_MAX_MOCK_TESTS).map((test) => (
                   <Card key={test.id} className="border-border opacity-60">
@@ -195,8 +194,11 @@ export function MockTestSelector({ onStartTest, isPaidUser, isTrial = false }: M
                         <Target className="h-3 w-3 ml-2" />
                         <span>Full Syllabus</span>
                       </div>
-                      <Button className="w-full" variant="secondary" asChild>
-                        <Link href="/pricing">Upgrade to Unlock</Link>
+                      <Button className="w-full gap-2" variant="secondary" asChild>
+                        <Link href="/pricing?ref=mock-limit">
+                          <Lock className="h-4 w-4" />
+                          Upgrade to Unlock
+                        </Link>
                       </Button>
                     </CardContent>
                   </Card>
@@ -249,7 +251,6 @@ export function MockTestSelector({ onStartTest, isPaidUser, isTrial = false }: M
         </CardContent>
       </Card>
 
-      {/* Leaderboard — trial users ko bhi dikhao */}
       {isPaidUser && (
         <div className="max-w-4xl mx-auto">
           <h2 className="text-xl font-bold text-foreground mb-4">🏆 Leaderboard</h2>

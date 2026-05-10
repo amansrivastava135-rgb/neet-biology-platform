@@ -6,9 +6,10 @@ import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
 import { AuthProvider, useAuth } from "@/lib/auth-context";
 import { PremiumGuard } from "@/components/premium-guard";
-import { isPremium } from "@/lib/checkPremium";
+import { isPremium, isTrial } from "@/lib/checkPremium";
 import { DashboardStats } from "@/components/dashboard/dashboard-stats";
 import dynamic from "next/dynamic";
+import { getRemainingDays } from "@/lib/subscription-utils";
 
 const ProgressChart = dynamic(
   () => import("@/components/dashboard/progress-chart").then(m => m.ProgressChart),
@@ -30,6 +31,8 @@ import { ProgressCards } from "@/components/dashboard/progress-cards";
 import { getResults, summarize, TestResult } from "@/lib/analytics";
 import { type UserProgress } from "@/lib/auth-context";
 import { Loader2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import Link from "next/link";
 
 function DashboardContent() {
   const { user, isLoading } = useAuth();
@@ -42,7 +45,6 @@ function DashboardContent() {
     chapterProgress: {},
   });
 
-  // Supabase se results load karo
   useEffect(() => {
     if (typeof window !== "undefined") {
       setResultsLoading(true);
@@ -52,7 +54,6 @@ function DashboardContent() {
     }
   }, []);
 
-  // Progress localStorage se load karo
   useEffect(() => {
     if (user) {
       try {
@@ -89,6 +90,8 @@ function DashboardContent() {
   const strongTopics = [...topicStats].sort((a, b) => b.accuracy - a.accuracy).slice(0, 5);
   const weakTopics = [...topicStats].sort((a, b) => a.accuracy - b.accuracy).slice(0, 5);
   const recentHistory = results.slice(0, 5);
+  const remainingDays = getRemainingDays(user);
+  const isTrialUser = isTrial(user);
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
@@ -105,6 +108,23 @@ function DashboardContent() {
                 : "Upgrade to Premium to access this feature."}
             </p>
           </div>
+
+          {/* Trial Expiry Banner */}
+          {isTrialUser && (
+            <div className="mb-6 p-4 bg-amber-50 border border-amber-300 rounded-lg flex items-center justify-between gap-4">
+              <div>
+                <p className="text-sm font-semibold text-amber-900">
+                  ⏳ Trial expires in {remainingDays} day{remainingDays !== 1 ? "s" : ""}
+                </p>
+                <p className="text-xs text-amber-700 mt-0.5">
+                  Upgrade now to keep access to all chapters, mock tests, and analytics
+                </p>
+              </div>
+              <Button size="sm" asChild className="shrink-0">
+                <Link href="/pricing?ref=dashboard-trial">Upgrade Now</Link>
+              </Button>
+            </div>
+          )}
 
           <QuickActions isPaid={user.isPaid} />
 

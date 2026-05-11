@@ -71,6 +71,31 @@ function saveProgressToStorage(
     });
     localStorage.setItem(progressKey, JSON.stringify(existing));
     localStorage.setItem("neet_progress", JSON.stringify(existing));
+    return { userId: user.id, progress: existing };
+  } catch {
+    return null;
+  }
+}
+
+async function syncProgressToSupabase(
+  questions: Question[],
+  answers: (string | null)[]
+) {
+  try {
+    const result = saveProgressToStorage(questions, answers);
+    if (!result) return;
+    const { userId, progress } = result;
+    if (!userId) return;
+    fetch("/api/progress", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        userId,
+        totalAttempted: progress.totalAttempted,
+        totalCorrect: progress.totalCorrect,
+        chapterProgress: progress.chapterProgress,
+      }),
+    }).catch(() => {});
   } catch {}
 }
 
@@ -241,7 +266,8 @@ export function TestEngine({
       if (timerRef.current) clearInterval(timerRef.current);
       const timeTaken = hasTimer ? totalTime - timeLeftRef.current : 0;
       clearStoredTest();
-      saveProgressToStorage(questionsRef.current, answersRef.current);
+      // localStorage save + Supabase sync
+      syncProgressToSupabase(questionsRef.current, answersRef.current);
       onSubmit({
         questions: questionsRef.current,
         answers: answersRef.current,

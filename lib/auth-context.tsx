@@ -7,6 +7,7 @@ import {
   useEffect,
   ReactNode,
 } from "react";
+import { fetchUserProgress, saveUserProgress } from "@/lib/progress-utils";
 
 export type User = {
   id: string;
@@ -17,8 +18,8 @@ export type User = {
   subscriptionStart?: string;
   subscriptionEnd?: string;
   subscription?: "free" | "active" | "expired";
-  plan?: string;                 
-  subscription_end?: string;     
+  plan?: string;
+  subscription_end?: string;
   isAdmin: boolean;
 };
 
@@ -84,6 +85,35 @@ function applySubscription(u: User, plan: string, days: number): User {
   };
 }
 
+async function loadProgress(userId: string): Promise<UserProgress> {
+  // Pehle Supabase se try karo
+  try {
+    const supabaseProgress = await fetchUserProgress(userId);
+    if (supabaseProgress.totalAttempted > 0 || Object.keys(supabaseProgress.chapterProgress).length > 0) {
+      // Supabase mein data hai — localStorage bhi sync karo
+      localStorage.setItem(progressKey(userId), JSON.stringify(supabaseProgress));
+      return supabaseProgress;
+    }
+  } catch {
+    // Supabase fail — fallback to localStorage
+  }
+
+  // Supabase empty ya failed — localStorage check karo
+  try {
+    const stored = localStorage.getItem(progressKey(userId));
+    if (stored) {
+      const localProgress = JSON.parse(stored) as UserProgress;
+      // localStorage mein data hai — Supabase mein bhi save karo (migration)
+      if (localProgress.totalAttempted > 0) {
+        saveUserProgress(userId, localProgress).catch(() => {});
+      }
+      return localProgress;
+    }
+  } catch {}
+
+  return EMPTY_PROGRESS;
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [progress, setProgress] = useState<UserProgress>(EMPTY_PROGRESS);
@@ -95,8 +125,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         const parsed: User = JSON.parse(storedUser);
         setUser(parsed);
-        const storedProgress = localStorage.getItem(progressKey(parsed.id));
-        setProgress(storedProgress ? JSON.parse(storedProgress) : EMPTY_PROGRESS);
+        // Supabase se load karo (localStorage fallback ke saath)
+        loadProgress(parsed.id).then(setProgress);
       } catch {
         setUser(null);
       }
@@ -130,9 +160,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const data = await res.json();
     if (data.success && data.user) {
       setUser(data.user);
-      const storedProgress = localStorage.getItem(progressKey(data.user.id));
-      setProgress(storedProgress ? JSON.parse(storedProgress) : EMPTY_PROGRESS);
       localStorage.setItem("neet_user", JSON.stringify(data.user));
+      // Supabase se progress load karo login pe
+      loadProgress(data.user.id).then(setProgress);
       return true;
     }
 
@@ -224,7 +254,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           },
         },
       };
+      // localStorage mein save karo (instant)
       localStorage.setItem(progressKey(user.id), JSON.stringify(newProgress));
+      // Supabase mein bhi save karo (async, fire-and-forget)
+      saveUserProgress(user.id, newProgress).catch(() => {});
       return newProgress;
     });
   };

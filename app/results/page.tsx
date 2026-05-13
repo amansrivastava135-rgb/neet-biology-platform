@@ -16,6 +16,8 @@ import {
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { getResults, TestResult } from "@/lib/analytics";
+import { supabase } from "@/lib/supabase";
+import { isGuided } from "@/lib/checkPremium";
 
 function formatTime(seconds: number): string {
   const h = Math.floor(seconds / 3600);
@@ -34,12 +36,20 @@ function getGrade(accuracy: number): { grade: string; color: string } {
   return { grade: "Needs Improvement", color: "text-red-600" };
 }
 
+interface WeeklyMockResult {
+  id: string;
+  generated_at: string;
+  completed_at: string;
+  score: number;
+  accuracy: number;
+  task_ref_id: string | null;
+}
+
 function ResultCard({ result, index }: { result: TestResult; index: number }) {
   const [expanded, setExpanded] = useState(false);
   const { grade, color } = getGrade(result.accuracy);
   const isFullTest = result.testType === "full";
 
-  // Test naam determine karo
   const testName = result.testLabel ||
     (isFullTest ? "Full Mock Test" :
     result.testType === "preview" ? "Demo Test" :
@@ -71,12 +81,10 @@ function ResultCard({ result, index }: { result: TestResult; index: number }) {
               </span>
             </div>
 
-            {/* Test Name — clearly visible */}
             <p className="text-sm font-semibold text-foreground mb-2">
               {testName}
             </p>
 
-            {/* Stats Row */}
             <div className="flex items-center gap-4 flex-wrap">
               <div className="flex items-center gap-1">
                 <Trophy className="h-4 w-4 text-primary" />
@@ -180,6 +188,7 @@ function ResultsContent() {
   const { user, isLoading: authLoading } = useAuth();
   const router = useRouter();
   const [results, setResults] = useState<TestResult[]>([]);
+  const [weeklyResults, setWeeklyResults] = useState<WeeklyMockResult[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -191,9 +200,24 @@ function ResultsContent() {
   useEffect(() => {
     if (user) {
       setLoading(true);
-      getResults()
-        .then((data) => setResults(data))
-        .finally(() => setLoading(false));
+      const fetchAll = async () => {
+        const [analyticsData] = await Promise.all([
+          getResults(),
+          isGuided(user)
+            ? supabase
+                .from("user_daily_tasks")
+                .select("id, generated_at, completed_at, score, accuracy, task_ref_id")
+                .eq("user_id", user.id)
+                .eq("task_type", "weekly_mock")
+                .not("completed_at", "is", null)
+                .order("completed_at", { ascending: false })
+                .then(({ data }) => setWeeklyResults(data ?? []))
+            : Promise.resolve(),
+        ]);
+        setResults(analyticsData);
+        setLoading(false);
+      };
+      fetchAll();
     }
   }, [user]);
 
@@ -212,13 +236,14 @@ function ResultsContent() {
     (r) => r.testType !== "full" && r.testType !== "preview"
   );
 
-  // Summary stats
   const totalTests = results.length;
   const avgAccuracy = totalTests > 0
     ? Math.round(results.reduce((s, r) => s + r.accuracy, 0) / totalTests)
     : 0;
   const bestScore = results.reduce((max, r) => Math.max(max, r.score), 0);
   const totalCorrect = results.reduce((s, r) => s + r.correct, 0);
+
+  const isGuidedUser = isGuided(user);
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
@@ -276,7 +301,7 @@ function ResultsContent() {
 
           {/* Tabs */}
           <Tabs defaultValue="mock">
-            <TabsList className="grid w-full max-w-md grid-cols-2 mb-6">
+            <TabsList className={`grid w-full mb-6 ${isGuidedUser ? "max-w-2xl grid-cols-3" : "max-w-md grid-cols-2"}`}>
               <TabsTrigger value="mock" className="gap-2">
                 <FileText className="h-4 w-4" />
                 Mock Test Results
@@ -295,6 +320,17 @@ function ResultsContent() {
                   </Badge>
                 )}
               </TabsTrigger>
+              {isGuidedUser && (
+                <TabsTrigger value="weekly" className="gap-2">
+                  <Trophy className="h-4 w-4" />
+                  Weekly Mock
+                  {weeklyResults.length > 0 && (
+                    <Badge variant="secondary" className="ml-1 text-xs">
+                      {weeklyResults.length}
+                    </Badge>
+                  )}
+                </TabsTrigger>
+              )}
             </TabsList>
 
             {/* Mock Test Results */}
@@ -348,6 +384,80 @@ function ResultsContent() {
                 </div>
               )}
             </TabsContent>
+
+            {/* Weekly Mock Results — Guided Plan only */}
+            {isGuidedUser && (
+              <TabsContent value="weekly">
+                {weeklyResults.length === 0 ? (
+                  <Card className="border-border">
+                    <CardContent className="py-12 text-center">
+                      <Trophy className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                      <p className="text-foreground font-medium mb-2">
+                        No weekly mock results yet
+                      </p>
+                      <p className="text-sm text-muted-foreground mb-4">
+                        Complete a Weekly Mock from your Guided Plan dashboard
+                      </p>
+                      <Button asChild>
+                        <Link href="/weekly-mock">Start Weekly Mock</Link>
+                      </Button>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <div className="space-y-4">
+                    {weeklyResults.map((r) => {
+                      const { grade, color } = getGrade(r.accuracy);
+                      return (
+                        <Card key={r.id} className="border-border">
+                          <CardContent className="pt-4 pb-4">
+                            <div className="flex items-center justify-between gap-4">
+                              <div>
+                                <div className="flex items-center gap-2 mb-1">
+                                  <Badge variant="default">Weekly Mock</Badge>
+                                  <span className="text-sm text-muted-foreground">
+                                    {new Date(r.completed_at).toLocaleDateString("en-IN", {
+                                      day: "numeric",
+                                      month: "short",
+                                      year: "numeric",
+                                    })}
+                                  </span>
+                                </div>
+                                <p className="text-sm font-semibold text-foreground mb-2">
+                                  {(() => {
+                                    try {
+                                      const names = r.task_ref_id ? JSON.parse(r.task_ref_id) as string[] : null;
+                                      return names?.length ? names.join(" + ") : "Weekly Mock — 60Q · 60 min";
+                                    } catch {
+                                      return "Weekly Mock — 60Q · 60 min";
+                                    }
+                                  })()}
+                                </p>
+                                <div className="flex items-center gap-4 flex-wrap mt-2">
+                                  <div className="flex items-center gap-1">
+                                    <Trophy className="h-4 w-4 text-primary" />
+                                    <span className="text-sm font-medium text-foreground">
+                                      {r.score}/60
+                                    </span>
+                                  </div>
+                                  <div className="flex items-center gap-1">
+                                    <Target className="h-4 w-4 text-blue-500" />
+                                    <span className={`text-sm font-medium ${color}`}>
+                                      {r.accuracy}%
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+                              <span className={`text-sm font-semibold ${color}`}>{grade}</span>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      );
+                    })}
+                  </div>
+                )}
+              </TabsContent>
+            )}
+
           </Tabs>
         </div>
       </main>

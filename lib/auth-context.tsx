@@ -14,13 +14,14 @@ export type User = {
   email: string;
   name: string;
   isPaid: boolean;
-  subscriptionPlan?: "free" | "monthly" | "sixMonth" | "premium" | "trial" | "expired";
+  subscriptionPlan?: "free" | "monthly" | "sixMonth" | "premium" | "trial" | "guided" | "expired";
   subscriptionStart?: string;
   subscriptionEnd?: string;
   subscription?: "free" | "active" | "expired";
   plan?: string;
   subscription_end?: string;
   isAdmin: boolean;
+  track?: "class11" | "class12" | "dropper";
 };
 
 export type UserProgress = {

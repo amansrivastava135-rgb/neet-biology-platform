@@ -13,6 +13,10 @@ export const PRICING = {
     displayText: "5 days of premium access",
     maxChapters: 5,
     maxMockTests: 3,
+    hasDaily10Q: true,
+    hasMiniMock: true,
+    miniMockQuestions: 25,
+    miniMockMaxUses: 2, // Day 1 + Day 4 only
   },
   monthly: {
     id: "monthly",
@@ -22,6 +26,8 @@ export const PRICING = {
     label: "30 Days Access",
     description: "NEET Biology 30 Days Plan",
     displayText: "30 days intensive preparation",
+    hasDaily10Q: true,
+    hasMiniMock: false,
   },
   sixMonth: {
     id: "sixMonth",
@@ -31,6 +37,8 @@ export const PRICING = {
     label: "6 Months Access",
     description: "Complete NEET Biology preparation for 6 months",
     displayText: "6 months of unlimited access",
+    hasDaily10Q: true,
+    hasMiniMock: false,
   },
   premium: {
     id: "premium",
@@ -42,6 +50,26 @@ export const PRICING = {
     description: "Complete NEET Biology preparation access for 1 year",
     displayText: "Unlimited access for 12 months",
     savings: 1500,
+    hasDaily10Q: true,
+    hasMiniMock: true,
+    miniMockQuestions: 25,
+    miniMockMaxUses: null, // unlimited
+  },
+  guided: {
+    id: "guided",
+    price: 1299,
+    originalPrice: 2999,
+    currency: "INR",
+    durationDays: 365,
+    label: "Guided Plan (1 Year)",
+    description: "NEET Biology Guided Preparation Plan",
+    displayText: "Complete guided prep for 12 months",
+    savings: 1700,
+    hasDaily10Q: true,
+    hasMiniMock: true,
+    miniMockQuestions: 25,
+    miniMockMaxUses: null, // unlimited
+    isGuided: true,
   },
 };
 
@@ -83,7 +111,8 @@ export const isSubscriptionExpiringSoon = (subscriptionEnd: Date): boolean => {
   return subscriptionEnd <= sevenDaysFromNow && subscriptionEnd > today;
 };
 
-// Trial helper
+// Trial helpers
 export const isTrial = (planId?: string) => planId === "trial";
 export const TRIAL_MAX_CHAPTERS = 5;
 export const TRIAL_MAX_MOCK_TESTS = 3;
+export const TRIAL_MINI_MOCK_MAX_USES = 2;

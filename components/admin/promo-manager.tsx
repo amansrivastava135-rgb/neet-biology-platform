@@ -46,7 +46,7 @@ type PromoUse = {
   used_at: string;
 };
 
-const PLAN_OPTIONS = ["crash", "sixMonth", "premium"];
+const PLAN_OPTIONS = ["monthly", "sixMonth", "premium", "guided"];
 
 export function PromoManager() {
   const [codes, setCodes] = useState<PromoCode[]>([]);
@@ -61,7 +61,7 @@ export function PromoManager() {
     discount_percent: "",
     discount_amount: "",
     max_uses: "100",
-    applicable_plans: ["crash", "sixMonth", "premium"],
+    applicable_plans: ["monthly", "sixMonth", "premium", "guided"],
     expires_at: "",
     created_by: "",
     commission_percent: "",
@@ -133,7 +133,7 @@ export function PromoManager() {
           discount_percent: "",
           discount_amount: "",
           max_uses: "100",
-          applicable_plans: ["crash", "sixMonth", "premium"],
+          applicable_plans: ["monthly", "sixMonth", "premium", "guided"],
           expires_at: "",
           created_by: "",
           commission_percent: "",
@@ -335,7 +335,7 @@ export function PromoManager() {
                           : "bg-background text-foreground border-border"
                       }`}
                     >
-                      {plan === "crash" ? "Crash Pack" : plan === "sixMonth" ? "6 Month" : "Yearly"}
+                      {plan === "monthly" ? "Monthly" : plan === "sixMonth" ? "6 Month" : plan === "premium" ? "Yearly" : "Guided Plan"}
                     </button>
                   ))}
                 </div>
@@ -550,8 +550,8 @@ export function PromoManager() {
                           <TableCell className="text-muted-foreground text-sm">{use.user_email}</TableCell>
                           <TableCell>
                             <Badge variant="outline" className="text-xs">
-                              {use.plan_id === "crash"
-                                ? "Crash Pack"
+                              {use.plan_id === "monthly"
+                                ? "Monthly"
                                 : use.plan_id === "sixMonth"
                                 ? "6 Month"
                                 : "Yearly"}

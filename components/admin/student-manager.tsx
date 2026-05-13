@@ -20,7 +20,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Search, Users, Crown, UserCircle, RefreshCw } from "lucide-react";
+import { Search, Users, Crown, UserCircle, RefreshCw, Map } from "lucide-react";
 import { PRICING } from "@/lib/pricing-config";
 
 type StudentData = {
@@ -31,6 +31,13 @@ type StudentData = {
   joinedAt: string;
   subscriptionEnd?: string;
   subscriptionPlan?: string;
+  track?: "class11" | "class12" | "dropper" | null;
+};
+
+const TRACK_LABELS: Record<string, string> = {
+  class11: "Class 11",
+  class12: "Class 12",
+  dropper: "Dropper",
 };
 
 export function StudentManager() {
@@ -39,6 +46,7 @@ export function StudentManager() {
   const [filterStatus, setFilterStatus] = useState("all");
   const [loadingEmail, setLoadingEmail] = useState<string | null>(null);
   const [grantPlanId, setGrantPlanId] = useState<Record<string, string>>({});
+  const [grantTrack, setGrantTrack] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
 
@@ -46,33 +54,33 @@ export function StudentManager() {
     setIsLoading(true);
     setFetchError(null);
     try {
-      const res = await fetch("/api/admin/students", {
-        credentials: "include",
-      });
+      const res = await fetch("/api/admin/students", { credentials: "include" });
       if (res.ok) {
         const data = await res.json();
-        if (data.students) {
-          setStudents(data.students);
-        }
+        if (data.students) setStudents(data.students);
       } else {
         const data = await res.json();
         setFetchError(data.error || "Failed to load students");
       }
-    } catch (err) {
-      console.error("Students load failed:", err);
+    } catch {
       setFetchError("Network error. Please try again.");
     } finally {
       setIsLoading(false);
     }
   };
 
-  useEffect(() => {
-    loadStudents();
-  }, []);
+  useEffect(() => { loadStudents(); }, []);
 
   const handleGivePremium = async (email: string) => {
     const planId = grantPlanId[email] || "premium";
     const plan = PRICING[planId as keyof typeof PRICING];
+    const track = grantTrack[email] || null;
+
+    // Guided plan requires a track to be selected
+    if (planId === "guided" && !track) {
+      alert("⚠️ Please select a track (Class 11 / Class 12 / Dropper) for the Guided Plan.");
+      return;
+    }
 
     setLoadingEmail(email);
     try {
@@ -80,7 +88,7 @@ export function StudentManager() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ email, action: "grant", planId }),
+        body: JSON.stringify({ email, action: "grant", planId, track }),
       });
 
       const data = await res.json();
@@ -90,7 +98,7 @@ export function StudentManager() {
       } else {
         alert(`❌ Error: ${data.error}`);
       }
-    } catch (err) {
+    } catch {
       alert("❌ Network error. Please try again.");
     } finally {
       setLoadingEmail(null);
@@ -114,7 +122,7 @@ export function StudentManager() {
       } else {
         alert(`❌ Error: ${data.error}`);
       }
-    } catch (err) {
+    } catch {
       alert("❌ Network error. Please try again.");
     } finally {
       setLoadingEmail(null);
@@ -128,17 +136,20 @@ export function StudentManager() {
     const matchesStatus =
       filterStatus === "all" ||
       (filterStatus === "paid" && student.isPaid) ||
-      (filterStatus === "free" && !student.isPaid);
+      (filterStatus === "free" && !student.isPaid) ||
+      (filterStatus === "guided" && student.subscriptionPlan === "guided");
     return matchesSearch && matchesStatus;
   });
 
   const paidCount = students.filter((s) => s.isPaid).length;
   const freeCount = students.filter((s) => !s.isPaid).length;
+  const guidedCount = students.filter((s) => s.subscriptionPlan === "guided").length;
 
   return (
     <div className="space-y-6">
+
       {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card className="border-border">
           <CardContent className="pt-6">
             <div className="flex items-center gap-4">
@@ -161,6 +172,19 @@ export function StudentManager() {
               <div>
                 <p className="text-2xl font-bold text-foreground">{paidCount}</p>
                 <p className="text-sm text-muted-foreground">Premium Users</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="border-border">
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-4">
+              <div className="h-10 w-10 rounded-lg bg-indigo-500/10 flex items-center justify-center">
+                <Map className="h-5 w-5 text-indigo-500" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-foreground">{guidedCount}</p>
+                <p className="text-sm text-muted-foreground">Guided Plan</p>
               </div>
             </div>
           </CardContent>
@@ -192,12 +216,13 @@ export function StudentManager() {
           />
         </div>
         <Select value={filterStatus} onValueChange={setFilterStatus}>
-          <SelectTrigger className="w-full sm:w-40">
+          <SelectTrigger className="w-full sm:w-44">
             <SelectValue placeholder="Filter" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Students</SelectItem>
             <SelectItem value="paid">Premium Only</SelectItem>
+            <SelectItem value="guided">Guided Only</SelectItem>
             <SelectItem value="free">Free Only</SelectItem>
           </SelectContent>
         </Select>
@@ -223,9 +248,7 @@ export function StudentManager() {
           ) : fetchError ? (
             <div className="text-center py-12">
               <p className="text-red-500 mb-4">{fetchError}</p>
-              <Button variant="outline" onClick={loadStudents}>
-                Try Again
-              </Button>
+              <Button variant="outline" onClick={loadStudents}>Try Again</Button>
             </div>
           ) : students.length === 0 ? (
             <div className="text-center py-12">
@@ -241,75 +264,117 @@ export function StudentManager() {
                     <TableHead>Email</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Plan</TableHead>
+                    <TableHead>Track</TableHead>
                     <TableHead>Joined</TableHead>
                     <TableHead>Expires</TableHead>
                     <TableHead>Action</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredStudents.map((student) => (
-                    <TableRow key={student.id}>
-                      <TableCell className="font-medium">{student.name}</TableCell>
-                      <TableCell className="text-muted-foreground">{student.email}</TableCell>
-                      <TableCell>
-                        <Badge variant={student.isPaid ? "default" : "secondary"}>
-                          {student.isPaid ? "Premium" : "Free"}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-muted-foreground text-xs">
-                        {student.subscriptionPlan || "—"}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">{student.joinedAt}</TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {student.subscriptionEnd
-                          ? new Date(student.subscriptionEnd).toLocaleDateString()
-                          : "—"}
-                      </TableCell>
-                      <TableCell>
-                        {student.isPaid ? (
-                          <Button
-                            variant="destructive"
-                            size="sm"
-                            onClick={() => handleRevokePremium(student.email)}
-                            disabled={loadingEmail === student.email}
+                  {filteredStudents.map((student) => {
+                    const selectedPlan = grantPlanId[student.email] || "premium";
+                    const isGuidedSelected = selectedPlan === "guided";
+
+                    return (
+                      <TableRow key={student.id}>
+                        <TableCell className="font-medium">{student.name}</TableCell>
+                        <TableCell className="text-muted-foreground text-xs">{student.email}</TableCell>
+                        <TableCell>
+                          <Badge
+                            variant={student.isPaid ? "default" : "secondary"}
+                            className={student.subscriptionPlan === "guided"
+                              ? "bg-indigo-100 text-indigo-700 border-indigo-200"
+                              : ""}
                           >
-                            {loadingEmail === student.email ? "Revoking..." : "Revoke"}
-                          </Button>
-                        ) : (
-                          <div className="flex items-center gap-2">
-                            <Select
-                              value={grantPlanId[student.email] || "premium"}
-                              onValueChange={(val) =>
-                                setGrantPlanId((prev) => ({
-                                  ...prev,
-                                  [student.email]: val,
-                                }))
-                              }
-                            >
-                              <SelectTrigger className="h-8 w-28 text-xs">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="monthly">Monthly (30d)</SelectItem>
-                                <SelectItem value="sixMonth">6 Month</SelectItem>
-                                <SelectItem value="premium">Yearly</SelectItem>
-                              </SelectContent>
-                            </Select>
+                            {student.subscriptionPlan === "guided"
+                              ? "🗺️ Guided"
+                              : student.isPaid ? "Premium" : "Free"}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-muted-foreground text-xs">
+                          {student.subscriptionPlan || "—"}
+                        </TableCell>
+                        <TableCell className="text-xs">
+                          {student.track ? (
+                            <Badge variant="outline" className="text-xs">
+                              {TRACK_LABELS[student.track] ?? student.track}
+                            </Badge>
+                          ) : "—"}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground text-xs">
+                          {student.joinedAt}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground text-xs">
+                          {student.subscriptionEnd
+                            ? new Date(student.subscriptionEnd).toLocaleDateString()
+                            : "—"}
+                        </TableCell>
+                        <TableCell>
+                          {student.isPaid ? (
                             <Button
-                              variant="default"
+                              variant="destructive"
                               size="sm"
-                              onClick={() => handleGivePremium(student.email)}
+                              onClick={() => handleRevokePremium(student.email)}
                               disabled={loadingEmail === student.email}
-                              className="gap-1"
                             >
-                              <Crown className="h-3 w-3" />
-                              {loadingEmail === student.email ? "Granting..." : "Grant"}
+                              {loadingEmail === student.email ? "Revoking..." : "Revoke"}
                             </Button>
-                          </div>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                          ) : (
+                            <div className="flex flex-col gap-1.5 min-w-[200px]">
+                              {/* Plan selector */}
+                              <div className="flex items-center gap-2">
+                                <Select
+                                  value={selectedPlan}
+                                  onValueChange={(val) =>
+                                    setGrantPlanId((prev) => ({ ...prev, [student.email]: val }))
+                                  }
+                                >
+                                  <SelectTrigger className="h-8 w-32 text-xs">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="monthly">Monthly (30d)</SelectItem>
+                                    <SelectItem value="sixMonth">6 Month</SelectItem>
+                                    <SelectItem value="premium">Yearly</SelectItem>
+                                    <SelectItem value="guided">🗺️ Guided (1yr)</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                                <Button
+                                  variant="default"
+                                  size="sm"
+                                  onClick={() => handleGivePremium(student.email)}
+                                  disabled={loadingEmail === student.email}
+                                  className="gap-1"
+                                >
+                                  <Crown className="h-3 w-3" />
+                                  {loadingEmail === student.email ? "Granting..." : "Grant"}
+                                </Button>
+                              </div>
+
+                              {/* Track selector — only visible when Guided is selected */}
+                              {isGuidedSelected && (
+                                <Select
+                                  value={grantTrack[student.email] || ""}
+                                  onValueChange={(val) =>
+                                    setGrantTrack((prev) => ({ ...prev, [student.email]: val }))
+                                  }
+                                >
+                                  <SelectTrigger className="h-8 w-full text-xs border-indigo-300">
+                                    <SelectValue placeholder="Select track…" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="class11">📘 Class 11</SelectItem>
+                                    <SelectItem value="class12">📗 Class 12</SelectItem>
+                                    <SelectItem value="dropper">🎯 Dropper</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              )}
+                            </div>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
             </div>

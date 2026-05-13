@@ -9,11 +9,208 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Shield, Zap, BookOpen, FileText, BarChart3, Clock, Tag, CheckCircle, XCircle, Crown } from "lucide-react";
+import {
+  Shield, Zap, BookOpen, FileText, BarChart3, Clock,
+  Tag, CheckCircle, XCircle, Crown, Check, X, Map,
+} from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { PRICING } from "@/lib/pricing-config";
 import { PricingCard } from "@/components/PricingCard";
+
+// ─── Feature comparison table data ───────────────────────────────────────────
+
+const COMPARISON = [
+  { feature: "All 38 Chapters",         free: false, monthly: true,  sixMonth: true,  premium: true,  guided: true  },
+  { feature: "3800+ MCQs",              free: false, monthly: true,  sixMonth: true,  premium: true,  guided: true  },
+  { feature: "NEET PYQs 2010–2024",     free: false, monthly: true,  sixMonth: true,  premium: true,  guided: true  },
+  { feature: "Unlimited Mock Tests",    free: false, monthly: true,  sixMonth: true,  premium: true,  guided: true  },
+  { feature: "Performance Analytics",   free: false, monthly: true,  sixMonth: true,  premium: true,  guided: true  },
+  { feature: "Daily 10Q Challenge",     free: false, monthly: true,  sixMonth: true,  premium: true,  guided: true  },
+  { feature: "Mini Mock Tests",         free: false, monthly: false, sixMonth: false, premium: true,  guided: true  },
+  { feature: "Guided Daily Plan",       free: false, monthly: false, sixMonth: false, premium: false, guided: true  },
+  { feature: "Chapter Progression",     free: false, monthly: false, sixMonth: false, premium: false, guided: true  },
+  { feature: "Streak Tracking",         free: false, monthly: false, sixMonth: false, premium: false, guided: true  },
+  { feature: "Weekly Mock Schedule",    free: false, monthly: false, sixMonth: false, premium: false, guided: true  },
+  { feature: "Monthly Grand Mock",      free: false, monthly: false, sixMonth: false, premium: false, guided: true  },
+  { feature: "10 Demo Questions",       free: true,  monthly: true,  sixMonth: true,  premium: true,  guided: true  },
+];
+
+type ColKey = "free" | "monthly" | "sixMonth" | "premium" | "guided";
+
+const COL_HEADERS: { key: ColKey; label: string; price: string; highlight?: boolean }[] = [
+  { key: "free",      label: "Free",      price: "₹0"    },
+  { key: "monthly",   label: "Monthly",   price: "₹249"  },
+  { key: "sixMonth",  label: "6 Months",  price: "₹599"  },
+  { key: "premium",   label: "Yearly",    price: "₹999"  },
+  { key: "guided",    label: "Guided",    price: "₹1299", highlight: true },
+];
+
+function ComparisonTable() {
+  return (
+    <div className="max-w-4xl mx-auto mb-16 overflow-x-auto">
+      <h2 className="text-2xl font-bold text-foreground text-center mb-6">
+        Plan Comparison
+      </h2>
+      <table className="w-full text-sm border-collapse">
+        <thead>
+          <tr>
+            <th className="text-left py-3 px-4 text-muted-foreground font-medium w-48">Feature</th>
+            {COL_HEADERS.map((col) => (
+              <th key={col.key} className={`text-center py-3 px-3 font-semibold
+                ${col.highlight ? "text-indigo-700 bg-indigo-50 rounded-t-lg" : "text-foreground"}`}>
+                <div>{col.label}</div>
+                <div className={`text-xs font-normal mt-0.5 ${col.highlight ? "text-indigo-500" : "text-muted-foreground"}`}>
+                  {col.price}
+                </div>
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {COMPARISON.map((row, i) => (
+            <tr key={row.feature} className={i % 2 === 0 ? "bg-muted/30" : ""}>
+              <td className="py-2.5 px-4 text-foreground">{row.feature}</td>
+              {COL_HEADERS.map((col) => (
+                <td key={col.key} className={`text-center py-2.5 px-3
+                  ${col.highlight ? "bg-indigo-50/60" : ""}`}>
+                  {row[col.key]
+                    ? <Check className="h-4 w-4 text-green-500 mx-auto" />
+                    : <X className="h-4 w-4 text-muted-foreground/40 mx-auto" />}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+// ─── Guided Plan Card ─────────────────────────────────────────────────────────
+
+function GuidedPlanCard({
+  onBuy,
+  loading,
+  isActive,
+  promoResult,
+}: {
+  onBuy: (planId: string) => void;
+  loading: boolean;
+  isActive: boolean;
+  promoResult?: { finalPrice: number; discountAmount: number; message: string };
+}) {
+  const promoValid = promoResult && promoResult.discountAmount > 0;
+  const displayPrice = promoValid ? promoResult!.finalPrice : PRICING.guided.price;
+
+  return (
+    <div className="max-w-4xl mx-auto mb-6">
+      <Card className="border-indigo-400 bg-indigo-50 dark:bg-indigo-950/20 relative shadow-md">
+        {/* Badges */}
+        <Badge className="absolute top-4 right-4 bg-indigo-600 text-white">
+          🏆 Best Value
+        </Badge>
+
+        <CardHeader className="pb-2">
+          <CardTitle className="text-xl flex items-center gap-2">
+            <Map className="h-5 w-5 text-indigo-600" />
+            Guided Preparation Plan
+            <Badge variant="outline" className="text-xs border-indigo-300 text-indigo-700 ml-1">
+              New
+            </Badge>
+          </CardTitle>
+          <CardDescription>
+            A structured daily plan that tells you exactly what to study — no guesswork
+          </CardDescription>
+        </CardHeader>
+
+        <CardContent>
+          <div className="flex flex-col sm:flex-row items-start justify-between gap-6">
+
+            {/* Features list */}
+            <ul className="text-sm text-muted-foreground space-y-1.5 flex-1">
+              <li className="flex items-center gap-2">
+                <Check className="h-4 w-4 text-indigo-500 shrink-0" />
+                <span className="text-foreground font-medium">Everything in Yearly Plan</span>
+              </li>
+              <li className="flex items-center gap-2">
+                <Check className="h-4 w-4 text-indigo-500 shrink-0" />
+                Daily task list — Daily 10Q + Chapter + Mini Mock
+              </li>
+              <li className="flex items-center gap-2">
+                <Check className="h-4 w-4 text-indigo-500 shrink-0" />
+                Smart chapter progression (Class 11 / 12 / Dropper track)
+              </li>
+              <li className="flex items-center gap-2">
+                <Check className="h-4 w-4 text-indigo-500 shrink-0" />
+                Weekly mock auto-scheduled by chapter block
+              </li>
+              <li className="flex items-center gap-2">
+                <Check className="h-4 w-4 text-indigo-500 shrink-0" />
+                Monthly Grand Mock after every 4 chapters
+              </li>
+              <li className="flex items-center gap-2">
+                <Check className="h-4 w-4 text-indigo-500 shrink-0" />
+                🔥 Streak tracking + consistency score
+              </li>
+            </ul>
+
+            {/* Price + CTA */}
+            <div className="text-center min-w-[160px]">
+              {/* Savings badge */}
+              <div className="flex items-center justify-center gap-2 mb-1">
+                <span className="text-base text-muted-foreground line-through">
+                  ₹{PRICING.guided.originalPrice}
+                </span>
+                <Badge variant="secondary" className="text-xs text-green-700 bg-green-100">
+                  Save ₹{PRICING.guided.savings}
+                </Badge>
+              </div>
+
+              {promoValid && (
+                <div className="flex items-center justify-center gap-1 mb-1">
+                  <span className="text-sm line-through text-muted-foreground">
+                    ₹{PRICING.guided.price}
+                  </span>
+                  <Badge variant="secondary" className="text-xs text-green-700 bg-green-100">
+                    {promoResult!.message}
+                  </Badge>
+                </div>
+              )}
+
+              <div className="text-4xl font-bold text-foreground mb-1">
+                ₹{displayPrice}
+              </div>
+              <p className="text-xs text-muted-foreground mb-1">1 Year Access</p>
+              <p className="text-xs text-indigo-600 font-medium mb-3">
+                = Just ₹3.6/day · structured prep
+              </p>
+
+              {isActive ? (
+                <Button className="w-full" disabled variant="outline">
+                  ✅ Current Plan
+                </Button>
+              ) : (
+                <Button
+                  className="w-full bg-indigo-600 hover:bg-indigo-700 text-white border-0"
+                  onClick={() => onBuy("guided")}
+                  disabled={loading}
+                >
+                  {loading ? "Processing..." : "Get Guided Plan — ₹" + displayPrice}
+                </Button>
+              )}
+              <p className="text-xs text-muted-foreground mt-2">
+                🔒 Secure · Instant access
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+// ─── Existing helpers (unchanged) ────────────────────────────────────────────
 
 const allFeatures = [
   { name: "10 Demo Questions", free: true, paid: true },
@@ -48,6 +245,7 @@ function getPlanLabel(planId?: string): string {
     case "monthly": return "Monthly Plan";
     case "sixMonth": return "6 Month Plan";
     case "premium": return "Yearly Plan";
+    case "guided": return "Guided Plan";
     default: return "Premium";
   }
 }
@@ -61,9 +259,7 @@ function CurrentSubscriptionBanner({ user }: { user: any }) {
 
   return (
     <div className={`max-w-4xl mx-auto mb-8 p-4 rounded-lg border flex items-center justify-between gap-4 ${
-      isTrialUser
-        ? "bg-green-50 border-green-300"
-        : "bg-primary/5 border-primary/30"
+      isTrialUser ? "bg-green-50 border-green-300" : "bg-primary/5 border-primary/30"
     }`}>
       <div className="flex items-center gap-3">
         <Crown className={`h-5 w-5 ${isTrialUser ? "text-green-600" : "text-primary"}`} />
@@ -74,7 +270,7 @@ function CurrentSubscriptionBanner({ user }: { user: any }) {
           {endDate && (
             <p className="text-sm text-muted-foreground">
               Expires: {new Date(endDate).toLocaleDateString("en-IN", {
-                day: "numeric", month: "short", year: "numeric"
+                day: "numeric", month: "short", year: "numeric",
               })}
             </p>
           )}
@@ -93,6 +289,8 @@ function CurrentSubscriptionBanner({ user }: { user: any }) {
     </div>
   );
 }
+
+// ─── Main pricing content ─────────────────────────────────────────────────────
 
 function PricingContent() {
   const { user, activateSubscription, updateUser } = useAuth();
@@ -116,7 +314,7 @@ function PricingContent() {
     if (!promo.code.trim()) return;
     setPromo((p) => ({ ...p, status: "loading", message: "" }));
 
-    const paidPlans = ["monthly", "sixMonth", "premium"];
+    const paidPlans = ["monthly", "sixMonth", "premium", "guided"];
     const results: Record<string, PromoResult> = {};
     let anyValid = false;
 
@@ -154,7 +352,12 @@ function PricingContent() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ code: promo.code, planId: "premium", email: user?.email }),
         }).then((r) => r.json());
-        setPromo((p) => ({ ...p, status: "invalid", message: res.message || "Invalid promo code", results: {} }));
+        setPromo((p) => ({
+          ...p,
+          status: "invalid",
+          message: res.message || "Invalid promo code",
+          results: {},
+        }));
       } catch {
         setPromo((p) => ({ ...p, status: "invalid", message: "Invalid promo code", results: {} }));
       }
@@ -230,7 +433,8 @@ function PricingContent() {
             };
             await updateUser(updatedUser);
             await activateSubscription(planId, planData.durationDays);
-            router.push("/dashboard");
+            // Guided plan → track selector onboarding, others → dashboard
+            router.push(planId === "guided" ? "/onboarding/track" : "/dashboard");
           } else {
             setError("Payment verification failed. Please contact support.");
           }
@@ -255,9 +459,7 @@ function PricingContent() {
     return promo.results[planId];
   };
 
-  const isCurrentPlan = (planId: string) => {
-    return isPaid && (currentPlanId === planId);
-  };
+  const isCurrentPlan = (planId: string) => isPaid && currentPlanId === planId;
 
   return (
     <div className="page-wrapper min-h-screen flex flex-col bg-background">
@@ -275,7 +477,6 @@ function PricingContent() {
               Get unlimited access to all NEET Biology preparation resources for less than
               the cost of a single coaching class.
             </p>
-            {/* Social proof */}
             <p className="text-sm text-muted-foreground mt-3">
               Trusted by{" "}
               <span className="text-foreground font-semibold">100+</span>{" "}
@@ -293,7 +494,7 @@ function PricingContent() {
             </div>
           )}
 
-          {/* Promo Code */}
+          {/* Promo Code — include guided in validation */}
           {(!isPaid || isTrialUser) && (
             <div className="max-w-4xl mx-auto mb-8" id="plans">
               <Card className="border-border">
@@ -345,7 +546,7 @@ function PricingContent() {
             </div>
           )}
 
-          {/* Trial Card */}
+          {/* ── Trial Card ── */}
           {!isPaid && (
             <div className="max-w-4xl mx-auto mb-6">
               <Card className="border-green-400 bg-green-50 dark:bg-green-950/20 relative">
@@ -384,7 +585,25 @@ function PricingContent() {
             </div>
           )}
 
-          {/* Monthly Plan */}
+          {/* ── Guided Plan Card (flagship) ── */}
+          {(!isPaid || isTrialUser) && (
+            <GuidedPlanCard
+              onBuy={handleBuy}
+              loading={loading && activePlanId === "guided"}
+              isActive={isCurrentPlan("guided")}
+              promoResult={getPromoForPlan("guided")}
+            />
+          )}
+          {/* Show to active guided users too (so they see their plan) */}
+          {isPaid && isCurrentPlan("guided") && (
+            <GuidedPlanCard
+              onBuy={handleBuy}
+              loading={false}
+              isActive={true}
+            />
+          )}
+
+          {/* ── Monthly Plan ── */}
           {(!isPaid || isTrialUser) && (
             <div className="max-w-4xl mx-auto mb-8">
               <Card className={`border-orange-400 bg-orange-50 dark:bg-orange-950/20 relative ${
@@ -411,9 +630,15 @@ function PricingContent() {
                     <div className="text-center min-w-[140px]">
                       {getPromoForPlan("monthly") ? (
                         <div className="mb-2">
-                          <span className="text-2xl line-through text-muted-foreground">₹{PRICING.monthly.price}</span>
-                          <span className="text-4xl font-bold text-foreground ml-2">₹{getPromoForPlan("monthly")!.finalPrice}</span>
-                          <p className="text-xs text-green-600 mt-1">{getPromoForPlan("monthly")!.message}</p>
+                          <span className="text-2xl line-through text-muted-foreground">
+                            ₹{PRICING.monthly.price}
+                          </span>
+                          <span className="text-4xl font-bold text-foreground ml-2">
+                            ₹{getPromoForPlan("monthly")!.finalPrice}
+                          </span>
+                          <p className="text-xs text-green-600 mt-1">
+                            {getPromoForPlan("monthly")!.message}
+                          </p>
                         </div>
                       ) : (
                         <div className="text-4xl font-bold text-foreground mb-2">₹249</div>
@@ -436,8 +661,10 @@ function PricingContent() {
             </div>
           )}
 
-          {/* Free + Yearly */}
-          <div className={`max-w-4xl mx-auto mb-8 ${(isPaid && !isTrialUser) ? "" : "grid grid-cols-1 md:grid-cols-2 gap-8"}`}>
+          {/* ── Free + Yearly ── */}
+          <div className={`max-w-4xl mx-auto mb-8 ${
+            isPaid && !isTrialUser ? "" : "grid grid-cols-1 md:grid-cols-2 gap-8"
+          }`}>
             {(!isPaid || isTrialUser) && (
               <PricingCard
                 plan="free"
@@ -457,7 +684,7 @@ function PricingContent() {
             />
           </div>
 
-          {/* 6 Month Plan */}
+          {/* ── 6 Month Plan ── */}
           {(!isPaid || isTrialUser) && (
             <div className="max-w-md mx-auto mb-6">
               <PricingCard
@@ -481,9 +708,14 @@ function PricingContent() {
             <span>Instant access after payment</span>
           </p>
 
-          {/* Features */}
+          {/* ── Feature Comparison Table ── */}
+          <ComparisonTable />
+
+          {/* ── What You Get (kept for SEO / skimmers) ── */}
           <div className="mb-16">
-            <h2 className="text-2xl font-bold text-foreground text-center mb-8">What You Get with Premium</h2>
+            <h2 className="text-2xl font-bold text-foreground text-center mb-8">
+              What You Get with Premium
+            </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               <Card className="border-border"><CardContent className="pt-6"><BookOpen className="h-10 w-10 text-primary mb-4" /><h3 className="font-semibold text-foreground mb-2">38 Complete Chapters</h3><p className="text-sm text-muted-foreground">Full access to Class 11 and Class 12 NCERT Biology chapters</p></CardContent></Card>
               <Card className="border-border"><CardContent className="pt-6"><FileText className="h-10 w-10 text-primary mb-4" /><h3 className="font-semibold text-foreground mb-2">3800+ MCQs</h3><p className="text-sm text-muted-foreground">100 questions per chapter with detailed NCERT-based explanations</p></CardContent></Card>
@@ -494,14 +726,17 @@ function PricingContent() {
             </div>
           </div>
 
-          {/* FAQ */}
+          {/* ── FAQ ── */}
           <div className="max-w-2xl mx-auto">
-            <h2 className="text-2xl font-bold text-foreground text-center mb-8">Frequently Asked Questions</h2>
+            <h2 className="text-2xl font-bold text-foreground text-center mb-8">
+              Frequently Asked Questions
+            </h2>
             <div className="space-y-4">
               <Card className="border-border"><CardContent className="pt-6"><h3 className="font-semibold text-foreground mb-2">Can I cancel my subscription anytime?</h3><p className="text-sm text-muted-foreground">Yes, you can cancel your subscription at any time. Your access will continue until the end of your billing period.</p></CardContent></Card>
               <Card className="border-border"><CardContent className="pt-6"><h3 className="font-semibold text-foreground mb-2">Is the content based on NCERT?</h3><p className="text-sm text-muted-foreground">Yes, all questions and explanations are strictly based on NCERT Biology textbooks and NEET exam patterns.</p></CardContent></Card>
               <Card className="border-border"><CardContent className="pt-6"><h3 className="font-semibold text-foreground mb-2">What payment methods are accepted?</h3><p className="text-sm text-muted-foreground">We accept UPI, debit cards, credit cards, and net banking through our secure payment gateway.</p></CardContent></Card>
               <Card className="border-border"><CardContent className="pt-6"><h3 className="font-semibold text-foreground mb-2">What is the Trial Pack?</h3><p className="text-sm text-muted-foreground">The 5-Day Trial gives you access to 5 chapters and 3 mock tests for just ₹29 — perfect for trying before buying.</p></CardContent></Card>
+              <Card className="border-border"><CardContent className="pt-6"><h3 className="font-semibold text-foreground mb-2">What is the Guided Plan?</h3><p className="text-sm text-muted-foreground">The Guided Plan gives you a personalised daily study schedule — Daily 10Q, chapter practice, mini mocks, and weekly tests — all auto-scheduled based on your track (Class 11, Class 12, or Dropper). No more guessing what to study next.</p></CardContent></Card>
               <Card className="border-border"><CardContent className="pt-6"><h3 className="font-semibold text-foreground mb-2">Do you have promo codes?</h3><p className="text-sm text-muted-foreground">Yes! Follow our social media or ask your coaching partner for exclusive promo codes and get instant discounts.</p></CardContent></Card>
             </div>
           </div>

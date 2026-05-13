@@ -12,7 +12,7 @@ export async function GET(req: NextRequest) {
 
     const { data, error } = await supabaseAdmin
       .from("users")
-      .select("id, name, email, is_paid, subscription_end, created_at")
+      .select("id, name, email, is_paid, subscription_plan, subscription_end, created_at, track")
       .order("created_at", { ascending: false });
 
     if (error) {
@@ -28,6 +28,8 @@ export async function GET(req: NextRequest) {
         ? new Date(u.created_at).toLocaleDateString()
         : "N/A",
       subscriptionEnd: u.subscription_end || undefined,
+      subscriptionPlan: u.subscription_plan || undefined,
+      track: u.track || null,
     }));
 
     return NextResponse.json({ students });

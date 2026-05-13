@@ -34,7 +34,6 @@ export default function HomePage() {
           <HeroSection />
           <FeaturesSection />
           <ChaptersPreview />
-          <PricingPreview />
           <AboutSection />
           <CTASection />
         </main>

@@ -32,13 +32,13 @@ export async function POST(req: Request) {
 
   try {
     await resend.emails.send({
-      from: "NEET Biology Platform <onboarding@resend.dev>",
+      from: "MASTER360 <onboarding@resend.dev>",
       to: email,
-      subject: "Your OTP for NEET Biology Platform",
+      subject: "Your OTP for MASTER360",
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 32px; background: #f9fafb; border-radius: 12px;">
           <div style="text-align: center; margin-bottom: 24px;">
-            <h1 style="color: #166534; font-size: 24px; margin: 0;">NEET Biology Platform</h1>
+            <h1 style="color: #166534; font-size: 24px; margin: 0;">MASTER360</h1>
             <p style="color: #6b7280; margin-top: 8px;">Dr. Amankumar Srivastav Pvt Tutorials</p>
           </div>
           <div style="background: white; border-radius: 8px; padding: 24px; text-align: center;">

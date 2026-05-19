@@ -9,11 +9,63 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
+// ─── Rate limiting (in-memory) ────────────────────────────────────────────────
+// Max 3 OTP sends per email per 10 minutes
+const otpSendLimit = new Map<string, { count: number; resetAt: number }>();
+
+// Max 5 failed verify attempts per email — reset on success or expiry
+const otpFailLimit = new Map<string, { count: number; resetAt: number }>();
+
+function checkSendRateLimit(email: string): boolean {
+  const now = Date.now();
+  const entry = otpSendLimit.get(email);
+  if (!entry || now > entry.resetAt) {
+    otpSendLimit.set(email, { count: 1, resetAt: now + 10 * 60 * 1000 });
+    return true;
+  }
+  if (entry.count >= 3) return false;
+  entry.count++;
+  return true;
+}
+
+function checkFailLimit(email: string): boolean {
+  const now = Date.now();
+  const entry = otpFailLimit.get(email);
+  if (!entry || now > entry.resetAt) return true;
+  return entry.count < 5;
+}
+
+function recordFailedAttempt(email: string): void {
+  const now = Date.now();
+  const entry = otpFailLimit.get(email);
+  if (!entry || now > entry.resetAt) {
+    otpFailLimit.set(email, { count: 1, resetAt: now + 10 * 60 * 1000 });
+  } else {
+    entry.count++;
+  }
+}
+
+function clearFailLimit(email: string): void {
+  otpFailLimit.delete(email);
+}
+
+// ─── POST /api/auth/send-otp ──────────────────────────────────────────────────
+
 export async function POST(req: Request) {
   const { email } = await req.json();
 
   if (!email) {
     return NextResponse.json({ error: "Email required" }, { status: 400 });
+  }
+
+  const normalizedEmail = email.toLowerCase().trim();
+
+  // Rate limit check
+  if (!checkSendRateLimit(normalizedEmail)) {
+    return NextResponse.json(
+      { error: "Too many OTP requests. Please wait 10 minutes before trying again." },
+      { status: 429 }
+    );
   }
 
   // Generate 6-digit OTP
@@ -23,7 +75,10 @@ export async function POST(req: Request) {
   // Store OTP in Supabase (upsert = update if exists)
   const { error: dbError } = await supabase
     .from("otp_store")
-    .upsert({ email, otp, expires_at }, { onConflict: "email" });
+    .upsert(
+      { email: normalizedEmail, otp, expires_at },
+      { onConflict: "email" }
+    );
 
   if (dbError) {
     console.error("Supabase OTP store error:", dbError);
@@ -33,7 +88,7 @@ export async function POST(req: Request) {
   try {
     await resend.emails.send({
       from: "MASTER360 <onboarding@resend.dev>",
-      to: email,
+      to: normalizedEmail,
       subject: "Your OTP for MASTER360",
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 32px; background: #f9fafb; border-radius: 12px;">
@@ -63,42 +118,61 @@ export async function POST(req: Request) {
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Email send error:", error);
-    // OTP store ho gayi thi, email fail hui — cleanup karo
-    await supabase.from("otp_store").delete().eq("email", email);
+    // Email failed — cleanup OTP from DB
+    await supabase.from("otp_store").delete().eq("email", normalizedEmail);
     return NextResponse.json({ error: "Failed to send email" }, { status: 500 });
   }
 }
 
+// ─── GET /api/auth/send-otp?email=&otp= ──────────────────────────────────────
+
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const email = searchParams.get("email");
-  const otp = searchParams.get("otp");
+  const otp   = searchParams.get("otp");
 
   if (!email || !otp) {
-    return NextResponse.json({ valid: false });
+    return NextResponse.json({ valid: false, error: "Email and OTP required" });
   }
 
-  // Supabase se OTP fetch karo
+  const normalizedEmail = email.toLowerCase().trim();
+
+  // Brute force protection
+  if (!checkFailLimit(normalizedEmail)) {
+    return NextResponse.json(
+      { valid: false, error: "Too many failed attempts. Please request a new OTP." },
+      { status: 429 }
+    );
+  }
+
   const { data, error } = await supabase
     .from("otp_store")
     .select("otp, expires_at")
-    .eq("email", email)
+    .eq("email", normalizedEmail)
     .single();
 
   if (error || !data) {
-    return NextResponse.json({ valid: false, error: "OTP not found" });
+    recordFailedAttempt(normalizedEmail);
+    return NextResponse.json({ valid: false, error: "OTP not found. Please request a new one." });
   }
 
   if (Date.now() > data.expires_at) {
-    await supabase.from("otp_store").delete().eq("email", email);
-    return NextResponse.json({ valid: false, error: "OTP expired" });
+    await supabase.from("otp_store").delete().eq("email", normalizedEmail);
+    clearFailLimit(normalizedEmail);
+    return NextResponse.json({ valid: false, error: "OTP expired. Please request a new one." });
   }
 
   if (data.otp !== otp) {
-    return NextResponse.json({ valid: false, error: "Invalid OTP" });
+    recordFailedAttempt(normalizedEmail);
+    const remaining = 5 - (otpFailLimit.get(normalizedEmail)?.count ?? 0);
+    return NextResponse.json({
+      valid: false,
+      error: `Invalid OTP. ${remaining} attempt${remaining !== 1 ? "s" : ""} remaining.`,
+    });
   }
 
-  // OTP sahi hai — delete karo (one-time use)
-  await supabase.from("otp_store").delete().eq("email", email);
+  // OTP correct — delete (one-time use) + clear fail counter
+  await supabase.from("otp_store").delete().eq("email", normalizedEmail);
+  clearFailLimit(normalizedEmail);
   return NextResponse.json({ valid: true });
 }

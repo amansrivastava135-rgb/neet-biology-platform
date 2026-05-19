@@ -10,6 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { BookOpen, Loader2, AlertCircle, Check } from "lucide-react";
 import { useAuth, AuthProvider } from "@/lib/auth-context";
+import { track } from "@vercel/analytics";
 
 function SignupForm() {
   const [name, setName] = useState("");
@@ -40,6 +41,7 @@ function SignupForm() {
     try {
       const success = await signup(email, password, name);
       if (success) {
+        track("signup_success");
         const storedUser = localStorage.getItem("neet_user");
         if (storedUser) {
           const user = JSON.parse(storedUser);
@@ -48,6 +50,7 @@ function SignupForm() {
           router.push("/dashboard");
         }
       } else {
+        track("signup_failed", { reason: "email_exists" });
         setError("Email already registered. Please use a different email.");
       }
     } catch {

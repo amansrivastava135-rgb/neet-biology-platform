@@ -41,15 +41,13 @@ export async function saveResult(result: TestResult): Promise<void> {
     try {
       const { data: existing } = await supabase
         .from("test_results")
-        .select("id, date, test_type, attempted")
+        .select("id, test_id, date, test_type, attempted")
         .eq("user_id", userId)
-        .gte("date", new Date(Date.now() - 2000).toISOString());
+        .gte("date", new Date(Date.now() - 30000).toISOString());
 
       const isDuplicate = (existing || []).some(
-        (r) =>
-          r.test_type === result.testType &&
-          r.attempted === result.attempted
-      );
+  (r) => r.test_id === result.testId
+);
 
       if (!isDuplicate) {
         const { error } = await supabase.from("test_results").insert({

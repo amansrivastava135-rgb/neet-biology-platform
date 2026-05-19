@@ -10,6 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { BookOpen, Loader2, AlertCircle, Mail, KeyRound } from "lucide-react";
 import { useAuth, AuthProvider } from "@/lib/auth-context";
+import { track } from "@vercel/analytics";
 
 function LoginForm() {
   const { login } = useAuth();
@@ -38,6 +39,7 @@ function LoginForm() {
       });
       const data = await res.json();
       if (data.success) {
+        track("otp_sent");
         setOtpSent(true);
       } else {
         setError("Failed to send OTP. Please try again.");
@@ -77,9 +79,11 @@ function LoginForm() {
     const loginData = await loginRes.json();
 
     if (loginRes.ok && loginData.user) {
+      track("login_success", { method: "otp" });
       localStorage.setItem("neet_user", JSON.stringify(loginData.user));
       router.push(loginData.user?.isAdmin ? "/admin" : "/dashboard");
     } else {
+      track("login_failed", { method: "otp" });
       setError(loginData.error || "No account found. Please sign up first.");
     }
   } catch {
@@ -96,10 +100,12 @@ function LoginForm() {
     try {
       const success = await login(email, password);
       if (success) {
+        track("login_success", { method: "password" });
         const storedUser = localStorage.getItem("neet_user");
         const loggedInUser = storedUser ? JSON.parse(storedUser) : null;
         router.push(loggedInUser?.isAdmin ? "/admin" : "/dashboard");
       } else {
+        track("login_failed", { method: "password" });
         setError("Invalid email or password. Please try again.");
       }
     } catch {

@@ -17,13 +17,14 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { PRICING } from "@/lib/pricing-config";
 import { PricingCard } from "@/components/PricingCard";
+import { track } from "@vercel/analytics";
 
 // ─── Feature comparison table data ───────────────────────────────────────────
 
 const COMPARISON = [
   { feature: "All 38 Chapters",         free: false, monthly: true,  sixMonth: true,  premium: true,  guided: true  },
   { feature: "3800+ MCQs",              free: false, monthly: true,  sixMonth: true,  premium: true,  guided: true  },
-  { feature: "NEET PYQs 2010–2024",     free: false, monthly: true,  sixMonth: true,  premium: true,  guided: true  },
+  { feature: "NEET PYQs 2010–2025",     free: false, monthly: true,  sixMonth: true,  premium: true,  guided: true  },
   { feature: "Unlimited Mock Tests",    free: false, monthly: true,  sixMonth: true,  premium: true,  guided: true  },
   { feature: "Performance Analytics",   free: false, monthly: true,  sixMonth: true,  premium: true,  guided: true  },
   { feature: "Daily 10Q Challenge",     free: false, monthly: true,  sixMonth: true,  premium: true,  guided: true  },
@@ -381,6 +382,7 @@ function PricingContent() {
     setError(null);
     setLoading(true);
     setActivePlanId(planId);
+    track("payment_initiated", { plan: planId });
 
     try {
       if (!process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID) {
@@ -423,7 +425,8 @@ function PricingContent() {
             }),
           }).then((r) => r.json());
 
-          if (verifyRes.success) {
+         if (verifyRes.success) {
+            track("payment_success", { plan: planId });
             const updatedUser = {
               ...user,
               ...verifyRes.user,
@@ -436,6 +439,7 @@ function PricingContent() {
             // Guided plan → track selector onboarding, others → dashboard
             router.push(planId === "guided" ? "/onboarding/track" : "/dashboard");
           } else {
+            track("payment_failed", { plan: planId });
             setError("Payment verification failed. Please contact support.");
           }
         },

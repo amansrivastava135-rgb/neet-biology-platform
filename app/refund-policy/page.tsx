@@ -14,7 +14,7 @@ export default function RefundPolicyPage() {
         <div className="space-y-6 text-foreground">
           <section>
             <h2 className="text-xl font-semibold mb-2">1. Overview</h2>
-            <p className="text-muted-foreground">Dr. Amankumar Srivastav Pvt Tutorials offers a partial refund policy for Premium subscriptions. Please read this policy carefully before making a purchase.</p>
+            <p className="text-muted-foreground">Dr. Amankumar Srivastav offers a partial refund policy for Premium subscriptions. Please read this policy carefully before making a purchase.</p>
           </section>
 
           <section>

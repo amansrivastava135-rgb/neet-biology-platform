@@ -94,7 +94,7 @@ export async function POST(req: Request) {
         <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 32px; background: #f9fafb; border-radius: 12px;">
           <div style="text-align: center; margin-bottom: 24px;">
             <h1 style="color: #166534; font-size: 24px; margin: 0;">MASTER360</h1>
-            <p style="color: #6b7280; margin-top: 8px;">Dr. Amankumar Srivastav Pvt Tutorials</p>
+            <p style="color: #6b7280; margin-top: 8px;">Dr. Amankumar Srivastav</p>
           </div>
           <div style="background: white; border-radius: 8px; padding: 24px; text-align: center;">
             <p style="color: #374151; margin-bottom: 16px;">Your OTP for login is:</p>

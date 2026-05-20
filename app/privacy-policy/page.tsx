@@ -14,7 +14,7 @@ export default function PrivacyPolicyPage() {
         <div className="space-y-6 text-foreground">
           <section>
             <h2 className="text-xl font-semibold mb-2">1. Introduction</h2>
-            <p className="text-muted-foreground">Dr. Amankumar Srivastav Pvt Tutorials ("we", "our", "us") operates the NEET Biology preparation platform at neet-biology-platform.vercel.app. This Privacy Policy explains how we collect, use, and protect your personal information.</p>
+            <p className="text-muted-foreground">Dr. Amankumar Srivastav ("we", "our", "us") operates the NEET Biology preparation platform at neet-biology-platform.vercel.app. This Privacy Policy explains how we collect, use, and protect your personal information.</p>
           </section>
 
           <section>

@@ -15,7 +15,7 @@ export function Footer() {
               </div>
               <div>
                 <p className="text-sm font-bold leading-tight tracking-wide">MASTER360</p>
-                <p className="text-xs text-sidebar-foreground/70">Dr. Amankumar Srivastav Pvt Tutorials</p>
+                <p className="text-xs text-sidebar-foreground/70">Dr. Amankumar Srivastav</p>
               </div>
             </div>
             <p className="text-sm text-sidebar-foreground/80 max-w-md leading-relaxed mb-3">

@@ -14,7 +14,7 @@ export default function TermsPage() {
         <div className="space-y-6 text-foreground">
           <section>
             <h2 className="text-xl font-semibold mb-2">1. Acceptance of Terms</h2>
-            <p className="text-muted-foreground">By accessing or using the NEET Biology platform by Dr. Amankumar Srivastav Pvt Tutorials, you agree to be bound by these Terms & Conditions.</p>
+            <p className="text-muted-foreground">By accessing or using the NEET Biology platform by Dr. Amankumar Srivastav, you agree to be bound by these Terms & Conditions.</p>
           </section>
 
           <section>
@@ -44,7 +44,7 @@ export default function TermsPage() {
 
           <section>
             <h2 className="text-xl font-semibold mb-2">5. Intellectual Property</h2>
-            <p className="text-muted-foreground">All content on this platform including questions, explanations, and materials is the intellectual property of Dr. Amankumar Srivastav Pvt Tutorials. Copying or redistribution is strictly prohibited.</p>
+            <p className="text-muted-foreground">All content on this platform including questions, explanations, and materials is the intellectual property of Dr. Amankumar Srivastav. Copying or redistribution is strictly prohibited.</p>
           </section>
 
           <section>

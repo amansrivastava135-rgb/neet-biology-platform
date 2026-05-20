@@ -90,7 +90,7 @@ function ResetPasswordForm() {
             </div>
             <div className="text-left">
               <p className="text-sm font-bold text-foreground leading-tight">Dr. Amankumar Srivastav</p>
-              <p className="text-xs text-muted-foreground">Pvt Tutorials</p>
+              <p className="text-xs text-muted-foreground"></p>
             </div>
           </Link>
         </div>

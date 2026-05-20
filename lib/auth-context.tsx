@@ -121,18 +121,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const storedUser = localStorage.getItem("neet_user");
-    if (storedUser) {
-      try {
-        const parsed: User = JSON.parse(storedUser);
-        setUser(parsed);
-        // Supabase se load karo (localStorage fallback ke saath)
-        loadProgress(parsed.id).then(setProgress);
-      } catch {
-        setUser(null);
+    const init = async () => {
+      const storedUser = localStorage.getItem("neet_user");
+      if (storedUser) {
+        try {
+          const parsed: User = JSON.parse(storedUser);
+          // Set immediately from localStorage for fast render
+          setUser(parsed);
+          loadProgress(parsed.id).then(setProgress);
+
+          // Then fetch fresh from DB to fix desync
+          const res = await fetch("/api/auth/me");
+          if (res.ok) {
+            const freshUser: User = await res.json();
+            // Check if subscription data changed
+            if (
+              freshUser.subscriptionPlan !== parsed.subscriptionPlan ||
+              freshUser.subscriptionEnd !== parsed.subscriptionEnd ||
+              freshUser.isPaid !== parsed.isPaid ||
+              freshUser.track !== parsed.track
+            ) {
+              setUser(freshUser);
+              localStorage.setItem("neet_user", JSON.stringify(freshUser));
+            }
+          }
+        } catch {
+          setUser(null);
+        }
       }
-    }
-    setIsLoading(false);
+      setIsLoading(false);
+    };
+    init();
   }, []);
 
   const login = async (email: string, password: string): Promise<boolean> => {

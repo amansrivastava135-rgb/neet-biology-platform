@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { saveResult, TestResult } from "@/lib/analytics";
+import { track } from "@vercel/analytics";
 
 export type ResultPageProps = {
   questions: Question[];
@@ -126,6 +127,12 @@ export function ResultPage({
 
     (async () => {
       await saveResult(result);
+      track("test_submit", {
+        type: testType,
+        score,
+        accuracy,
+        questions: totalQuestions,
+      });
     })();
 
     if (testType === "full") {

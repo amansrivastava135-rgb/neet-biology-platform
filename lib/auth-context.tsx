@@ -22,6 +22,7 @@ export type User = {
   subscription_end?: string;
   isAdmin: boolean;
   track?: "class11" | "class12" | "dropper";
+  devices?: string[];
 };
 
 export type UserProgress = {

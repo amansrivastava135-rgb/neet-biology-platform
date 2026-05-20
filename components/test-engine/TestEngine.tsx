@@ -82,20 +82,56 @@ async function syncProgressToSupabase(
   answers: (string | null)[]
 ) {
   try {
-    const result = saveProgressToStorage(questions, answers);
-    if (!result) return;
-    const { userId, progress } = result;
-    if (!userId) return;
-    fetch("/api/progress", {
+    const storedUser = localStorage.getItem("neet_user");
+    if (!storedUser) return;
+    const user = JSON.parse(storedUser);
+    if (!user.id) return;
+
+    // Fetch current from Supabase (source of truth)
+    let current = { totalAttempted: 0, totalCorrect: 0, chapterProgress: {} as Record<string, { attempted: number; correct: number }> };
+    try {
+      const getRes = await fetch("/api/progress");
+      if (getRes.ok) {
+        const data = await getRes.json();
+        if (!data.error) current = data;
+      }
+    } catch {}
+
+    // Add new answers on top of Supabase data
+    const updated = {
+      totalAttempted: current.totalAttempted || 0,
+      totalCorrect: current.totalCorrect || 0,
+      chapterProgress: { ...current.chapterProgress },
+    };
+
+    questions.forEach((q, i) => {
+      const answer = answers[i];
+      if (answer !== null) {
+        const isCorrect = answer === q.correctAnswer;
+        updated.totalAttempted += 1;
+        updated.totalCorrect += isCorrect ? 1 : 0;
+        if (!updated.chapterProgress[q.chapterId]) {
+          updated.chapterProgress[q.chapterId] = { attempted: 0, correct: 0 };
+        }
+        updated.chapterProgress[q.chapterId].attempted += 1;
+        updated.chapterProgress[q.chapterId].correct += isCorrect ? 1 : 0;
+      }
+    });
+
+    // Save to Supabase
+    await fetch("/api/progress", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        userId,
-        totalAttempted: progress.totalAttempted,
-        totalCorrect: progress.totalCorrect,
-        chapterProgress: progress.chapterProgress,
+        userId: user.id,
+        totalAttempted: updated.totalAttempted,
+        totalCorrect: updated.totalCorrect,
+        chapterProgress: updated.chapterProgress,
       }),
-    }).catch(() => {});
+    });
+
+    // Update localStorage as cache
+    localStorage.setItem(`neet_progress_${user.id}`, JSON.stringify(updated));
   } catch {}
 }
 

@@ -147,36 +147,6 @@ export function ResultPage({
         });
       }
     }
-
-    try {
-      const storedUser = localStorage.getItem("neet_user");
-      if (storedUser) {
-        const user = JSON.parse(storedUser);
-        const progressKey = `neet_progress_${user.id}`;
-        const existing = JSON.parse(
-          localStorage.getItem(progressKey) ||
-          localStorage.getItem("neet_progress") ||
-          '{"totalAttempted":0,"totalCorrect":0,"chapterProgress":{}}'
-        );
-        questions.forEach((q, i) => {
-          const answer = answers[i];
-          if (answer !== null) {
-            const isCorrect = answer === q.correctAnswer;
-            existing.totalAttempted += 1;
-            existing.totalCorrect += isCorrect ? 1 : 0;
-            if (!existing.chapterProgress[q.chapterId]) {
-              existing.chapterProgress[q.chapterId] = { attempted: 0, correct: 0 };
-            }
-            existing.chapterProgress[q.chapterId].attempted += 1;
-            existing.chapterProgress[q.chapterId].correct += isCorrect ? 1 : 0;
-          }
-        });
-        localStorage.setItem(progressKey, JSON.stringify(existing));
-        localStorage.setItem("neet_progress", JSON.stringify(existing));
-      }
-    } catch {
-      // ignore
-    }
   }, []);
 
   const weakTopics = (() => {

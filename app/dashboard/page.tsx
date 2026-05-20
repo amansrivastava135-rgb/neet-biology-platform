@@ -10,6 +10,7 @@ import { isPremium, isTrial, hasDaily10Q, hasMiniMock, isGuided } from "@/lib/ch
 import { DashboardStats } from "@/components/dashboard/dashboard-stats";
 import dynamic from "next/dynamic";
 import { getRemainingDays } from "@/lib/subscription-utils";
+import { fetchUserProgress } from "@/lib/progress-utils";
 
 const ProgressChart = dynamic(
   () => import("@/components/dashboard/progress-chart").then(m => m.ProgressChart),
@@ -375,17 +376,15 @@ function DashboardContent() {
 
   useEffect(() => {
     if (user) {
-      try {
-        const progressKey = `neet_progress_${user.id}`;
-        const stored = localStorage.getItem(progressKey);
-        if (stored) {
-          setProgress(JSON.parse(stored));
-        } else {
-          setProgress({ totalAttempted: 0, totalCorrect: 0, chapterProgress: {} });
-        }
-      } catch {
-        // ignore
-      }
+      fetchUserProgress(user.id)
+        .then((data) => setProgress(data))
+        .catch(() => {
+          // Fallback to localStorage if API fails
+          try {
+            const stored = localStorage.getItem(`neet_progress_${user.id}`);
+            if (stored) setProgress(JSON.parse(stored));
+          } catch {}
+        });
     }
   }, [user]);
 

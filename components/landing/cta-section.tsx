@@ -1,8 +1,13 @@
+"use client";
+
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { ArrowRight } from "lucide-react";
+import { useAuth } from "@/lib/auth-context";
 
 export function CTASection() {
+  const { user } = useAuth();
+
   return (
     <section className="py-20 bg-primary text-primary-foreground">
       <div className="container mx-auto px-4 text-center">
@@ -14,20 +19,33 @@ export function CTASection() {
           with chapter-wise practice and comprehensive mock tests.
         </p>
         <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4">
-          <Button size="lg" variant="secondary" asChild className="gap-2 w-full sm:w-auto">
-            <Link href="/signup">
-              Start Free Trial
-              <ArrowRight className="h-4 w-4" />
-            </Link>
-          </Button>
-          <Button
-            size="lg"
-            variant="outline"
-            asChild
-            className="w-full sm:w-auto bg-transparent border-primary-foreground/30 text-primary-foreground hover:bg-primary-foreground/10 hover:text-primary-foreground"
-          >
-            <Link href="/practice?demo=true">Try Demo Questions</Link>
-          </Button>
+          {user ? (
+            // Logged-in users — go to dashboard
+            <Button size="lg" variant="secondary" asChild className="gap-2 w-full sm:w-auto">
+              <Link href="/dashboard">
+                Go to Dashboard
+                <ArrowRight className="h-4 w-4" />
+              </Link>
+            </Button>
+          ) : (
+            // Guests — signup + demo
+            <>
+              <Button size="lg" variant="secondary" asChild className="gap-2 w-full sm:w-auto">
+                <Link href="/signup">
+                  Start Free Trial
+                  <ArrowRight className="h-4 w-4" />
+                </Link>
+              </Button>
+              <Button
+                size="lg"
+                variant="outline"
+                asChild
+                className="w-full sm:w-auto bg-transparent border-primary-foreground/30 text-primary-foreground hover:bg-primary-foreground/10 hover:text-primary-foreground"
+              >
+                <Link href="/practice?demo=true">Try Demo Questions</Link>
+              </Button>
+            </>
+          )}
         </div>
       </div>
     </section>

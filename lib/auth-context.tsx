@@ -186,6 +186,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       loadProgress(data.user.id).then(setProgress);
       return true;
     }
+    // Trigger PWA install prompt after login
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new Event("m360_user_logged_in"));
+    }
 
     return false;
   };

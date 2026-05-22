@@ -12,6 +12,7 @@ import { ChapterManager } from "@/components/admin/chapter-manager";
 import { StudentManager } from "@/components/admin/student-manager";
 import { MockTestManager } from "@/components/admin/mock-test-manager";
 import { PromoManager } from "@/components/admin/promo-manager";
+import { ResourceManager } from "@/components/admin/resource-manager";
 import { Loader2, Shield } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
@@ -66,19 +67,20 @@ function AdminContent() {
           <div className="mb-8">
             <h1 className="text-3xl font-bold text-foreground">Admin Panel</h1>
             <p className="text-muted-foreground mt-1">
-              Manage questions, chapters, students, mock tests, subscriptions and promo codes
+              Manage questions, chapters, students, mock tests, subscriptions, promo codes and resources
             </p>
           </div>
 
           <Tabs value={activeTab} onValueChange={setActiveTab}>
             <div className="overflow-x-auto mb-8">
-              <TabsList className="grid w-full max-w-4xl grid-cols-6 min-w-[600px]">
+              <TabsList className="grid w-full max-w-5xl grid-cols-7 min-w-[700px]">
                 <TabsTrigger value="overview">Overview</TabsTrigger>
                 <TabsTrigger value="questions">Questions</TabsTrigger>
                 <TabsTrigger value="chapters">Chapters</TabsTrigger>
                 <TabsTrigger value="students">Students</TabsTrigger>
                 <TabsTrigger value="mocktests">Mock Tests</TabsTrigger>
                 <TabsTrigger value="promo">Promo Codes</TabsTrigger>
+                <TabsTrigger value="resources">Resources</TabsTrigger>
               </TabsList>
             </div>
 
@@ -99,6 +101,9 @@ function AdminContent() {
             </TabsContent>
             <TabsContent value="promo">
               <PromoManager />
+            </TabsContent>
+            <TabsContent value="resources">
+              <ResourceManager />
             </TabsContent>
           </Tabs>
         </div>

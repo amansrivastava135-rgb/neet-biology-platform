@@ -6,7 +6,21 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { class11Chapters, class12Chapters } from "@/lib/data";
-import { BookOpen, Lock, Play, Sparkles, ChevronRight, X, Calendar, Loader2 } from "lucide-react";
+import {
+  BookOpen,
+  Lock,
+  Play,
+  Sparkles,
+  ChevronRight,
+  X,
+  Calendar,
+  Loader2,
+  FileText,
+  Brain,
+  Map,
+  BookMarked,
+  ExternalLink,
+} from "lucide-react";
 import { TRIAL_MAX_CHAPTERS } from "@/lib/pricing-config";
 
 type ChapterSelectorProps = {
@@ -25,6 +39,41 @@ type SetInfo = {
   type: "auto" | "manual";
 };
 
+type ResourceInfo = {
+  id: string;
+  resource_type: string;
+  title: string;
+  description: string | null;
+  signedUrl: string | null;
+};
+
+// Resource type display config
+const RESOURCE_CONFIG: Record<
+  string,
+  { icon: React.ReactNode; label: string; description: string }
+> = {
+  roadmap: {
+    icon: <Map className="h-5 w-5" />,
+    label: "Study Plan",
+    description: "Structured roadmap for this chapter",
+  },
+  intelligence: {
+    icon: <Brain className="h-5 w-5" />,
+    label: "Intelligence Module",
+    description: "RE-NEET intelligence analysis",
+  },
+  revision: {
+    icon: <BookMarked className="h-5 w-5" />,
+    label: "Revision Notes",
+    description: "Quick revision for exam day",
+  },
+  "pyq-analysis": {
+    icon: <FileText className="h-5 w-5" />,
+    label: "PYQ Analysis",
+    description: "Previous year question patterns",
+  },
+};
+
 async function getSetsForChapter(chapterId: number): Promise<SetInfo[]> {
   try {
     const res = await fetch(`/api/questions?chapterId=${chapterId}`, {
@@ -34,6 +83,19 @@ async function getSetsForChapter(chapterId: number): Promise<SetInfo[]> {
     const data = await res.json();
     const sets = (data.sets || []).filter((s: SetInfo) => s.label !== "PYQ Set");
     return sets;
+  } catch {
+    return [];
+  }
+}
+
+async function getResourcesForChapter(chapterId: number): Promise<ResourceInfo[]> {
+  try {
+    const res = await fetch(`/api/resources?chapterId=${chapterId}`, {
+      credentials: "include",
+    });
+    if (!res.ok) return [];
+    const data = await res.json();
+    return data.resources || [];
   } catch {
     return [];
   }
@@ -64,6 +126,66 @@ async function fetchPYQData() {
     return [];
   }
 }
+
+// ─── Resource Card (inside modal) ────────────────────────────────────────────
+
+function ResourceCard({
+  resource,
+  chapterId,
+  chapterName,
+}: {
+  resource: ResourceInfo;
+  chapterId: number;
+  chapterName: string;
+}) {
+  const config = RESOURCE_CONFIG[resource.resource_type] ?? {
+    icon: <FileText className="h-5 w-5" />,
+    label: resource.title,
+    description: "",
+  };
+
+  const handleOpen = () => {
+    const params = new URLSearchParams({
+      id: resource.id,
+      chapterId: String(chapterId),
+      chapter: chapterName,
+      title: resource.title,
+    });
+    window.location.href = `/view-resource?${params.toString()}`;
+  };
+
+  return (
+    <button
+      onClick={handleOpen}
+      disabled={!resource.id}
+      className="w-full group flex items-center gap-4 px-4 py-3.5 rounded-xl border border-border
+        hover:border-primary/40 hover:bg-primary/[0.03] transition-all text-left
+        disabled:opacity-40 disabled:cursor-not-allowed"
+    >
+      {/* Icon */}
+      <div className="h-10 w-10 rounded-lg bg-primary/8 flex items-center justify-center
+        text-primary shrink-0 group-hover:bg-primary/12 transition-colors">
+        {config.icon}
+      </div>
+
+      {/* Text */}
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium text-foreground leading-tight">
+          {resource.title || config.label}
+        </p>
+        <p className="text-xs text-muted-foreground mt-0.5 leading-tight">
+          {resource.description || config.description}
+        </p>
+      </div>
+
+      {/* Arrow */}
+      <ExternalLink className="h-3.5 w-3.5 text-muted-foreground shrink-0
+        group-hover:text-primary transition-colors" />
+    </button>
+  );
+}
+
+// ─── PYQ Tab (unchanged) ─────────────────────────────────────────────────────
 
 function PYQTab({
   onStartPYQYear,
@@ -251,7 +373,7 @@ function PYQTab({
         <div className="mt-8 p-6 bg-secondary/50 rounded-lg text-center">
           <p className="text-foreground font-medium mb-2">Unlock all PYQs with Premium</p>
           <p className="text-muted-foreground text-sm mb-4">
-            Access year-wise and chapter-wise PYQs from 2010-2024
+            Access year-wise and chapter-wise PYQs from 2010–2024
           </p>
           <Button asChild><a href="/pricing">View Pricing</a></Button>
         </div>
@@ -259,6 +381,8 @@ function PYQTab({
     </div>
   );
 }
+
+// ─── Chapter Card ─────────────────────────────────────────────────────────────
 
 function ChapterCard({
   chapter,
@@ -328,7 +452,7 @@ function ChapterCard({
           }}
         >
           {isUnlocked ? (
-            <><Play className="h-4 w-4 mr-2" />Select Set</>
+            <><BookOpen className="h-4 w-4 mr-2" />Open Chapter</>
           ) : isTrial ? (
             <><Lock className="h-4 w-4 mr-2" />Upgrade to Unlock All 38 Chapters</>
           ) : (
@@ -340,6 +464,167 @@ function ChapterCard({
   );
 }
 
+// ─── Chapter Hub Modal ────────────────────────────────────────────────────────
+
+function ChapterHubModal({
+  chapter,
+  onClose,
+  onSelectSet,
+  isPaidUser,
+}: {
+  chapter: { id: number; name: string };
+  onClose: () => void;
+  onSelectSet: (setNumber: number) => void;
+  isPaidUser: boolean;
+}) {
+  const [sets, setSets] = useState<SetInfo[]>([]);
+  const [resources, setResources] = useState<ResourceInfo[]>([]);
+  const [setsLoading, setSetsLoading] = useState(true);
+  const [resourcesLoading, setResourcesLoading] = useState(true);
+
+  useEffect(() => {
+    getSetsForChapter(chapter.id).then((s) => {
+      setSets(s);
+      setSetsLoading(false);
+    });
+
+    if (isPaidUser) {
+      getResourcesForChapter(chapter.id).then((r) => {
+        setResources(r);
+        setResourcesLoading(false);
+      });
+    } else {
+      setResourcesLoading(false);
+    }
+  }, [chapter.id, isPaidUser]);
+
+  const hasResources = resources.length > 0;
+
+  return (
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+      {/* Sheet on mobile, modal on desktop */}
+      <div className="w-full sm:max-w-md bg-card rounded-t-2xl sm:rounded-2xl border border-border
+        max-h-[92vh] flex flex-col overflow-hidden shadow-xl">
+
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-border shrink-0">
+          <div className="min-w-0">
+            <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide mb-0.5">
+              Chapter {chapter.id}
+            </p>
+            <h2 className="text-base font-semibold text-foreground leading-snug truncate">
+              {chapter.name}
+            </h2>
+          </div>
+          <button
+            onClick={onClose}
+            className="h-8 w-8 rounded-full flex items-center justify-center
+              hover:bg-muted transition-colors text-muted-foreground shrink-0 ml-3"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        {/* Scrollable body */}
+        <div className="flex-1 overflow-y-auto">
+
+          {/* ── Section 1: Resources ─────────────────────────── */}
+          <div className="px-5 pt-5 pb-4">
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                MASTER360 Resources
+              </p>
+            </div>
+
+            {!isPaidUser ? (
+              <div className="rounded-xl border border-border bg-muted/40 px-4 py-3.5 text-center">
+                <p className="text-xs text-muted-foreground">
+                  Resources available with Premium plans
+                </p>
+              </div>
+            ) : resourcesLoading ? (
+              <div className="flex items-center justify-center py-5">
+                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+              </div>
+            ) : !hasResources ? (
+              <div className="rounded-xl border border-border bg-muted/30 px-4 py-3.5 text-center">
+                <p className="text-xs text-muted-foreground">
+                  Resources coming soon for this chapter
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {resources.map((resource) => (
+                  <ResourceCard
+                    key={resource.id}
+                    resource={resource}
+                    chapterId={chapter.id}
+                    chapterName={chapter.name}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Divider */}
+          <div className="mx-5 border-t border-border" />
+
+          {/* ── Section 2: Practice Sets ─────────────────────── */}
+          <div className="px-5 pt-4 pb-6">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">
+              Practice Sets
+            </p>
+
+            {setsLoading ? (
+              <div className="flex items-center justify-center py-6">
+                <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                <span className="ml-2 text-sm text-muted-foreground">Loading sets…</span>
+              </div>
+            ) : sets.length === 0 ? (
+              <div className="text-center py-5 rounded-xl border border-border bg-muted/30">
+                <p className="text-sm text-muted-foreground">No questions available yet.</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Admin can add questions from the admin panel.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {sets.map((set) => (
+                  <button
+                    key={set.setNumber}
+                    onClick={() => onSelectSet(set.setNumber)}
+                    className="w-full p-4 border border-border rounded-xl
+                      hover:border-primary/50 hover:bg-primary/[0.03]
+                      transition-all flex items-center justify-between group"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                        <span className="text-sm font-bold text-primary">{set.setNumber}</span>
+                      </div>
+                      <div className="text-left">
+                        <p className="text-sm font-medium text-foreground">{set.label}</p>
+                        <p className="text-xs text-muted-foreground">{set.questionCount} questions</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-primary font-medium opacity-0 group-hover:opacity-100 transition-opacity">
+                        Start
+                      </span>
+                      <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Main ChapterSelector ─────────────────────────────────────────────────────
+
 export function ChapterSelector({
   onSelectChapter,
   onStartDemo,
@@ -350,19 +635,12 @@ export function ChapterSelector({
 }: ChapterSelectorProps) {
   const [activeTab, setActiveTab] = useState<"11" | "12" | "pyq">("11");
   const [selectedChapter, setSelectedChapter] = useState<{ id: number; name: string } | null>(null);
-  const [sets, setSets] = useState<SetInfo[]>([]);
-  const [setsLoading, setSetsLoading] = useState(false);
 
   const TRIAL_CLASS11_LIMIT = 3;
   const TRIAL_CLASS12_LIMIT = 2;
 
-  const handleChapterClick = async (chapter: { id: number; name: string }) => {
+  const handleChapterClick = (chapter: { id: number; name: string }) => {
     setSelectedChapter(chapter);
-    setSets([]);
-    setSetsLoading(true);
-    const chapterSets = await getSetsForChapter(chapter.id);
-    setSets(chapterSets);
-    setSetsLoading(false);
   };
 
   const handleSetClick = (setNumber: number) => {
@@ -384,7 +662,7 @@ export function ChapterSelector({
       <div className="text-center mb-8">
         <h1 className="text-3xl font-bold text-foreground mb-2">Chapter-wise Practice</h1>
         <p className="text-muted-foreground">
-          Select a chapter to start practicing NCERT-based MCQs
+          Select a chapter to access resources and practice MCQs
         </p>
       </div>
 
@@ -429,54 +707,14 @@ export function ChapterSelector({
         </Card>
       )}
 
+      {/* Chapter Hub Modal */}
       {selectedChapter && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <Card className="w-full max-w-md border-border">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-lg">{selectedChapter.name}</CardTitle>
-                <Button variant="ghost" size="icon" onClick={() => setSelectedChapter(null)}>
-                  <X className="h-4 w-4" />
-                </Button>
-              </div>
-              <p className="text-sm text-muted-foreground">Select a set to practice</p>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {setsLoading ? (
-                <div className="flex items-center justify-center py-8">
-                  <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                  <span className="ml-2 text-muted-foreground text-sm">Loading sets...</span>
-                </div>
-              ) : sets.length === 0 ? (
-                <div className="text-center py-6">
-                  <p className="text-muted-foreground text-sm">No questions available yet.</p>
-                  <p className="text-muted-foreground text-xs mt-1">
-                    Admin can add questions from the admin panel.
-                  </p>
-                </div>
-              ) : (
-                sets.map((set) => (
-                  <button
-                    key={set.setNumber}
-                    onClick={() => handleSetClick(set.setNumber)}
-                    className="w-full p-4 border border-border rounded-lg hover:border-primary/50 hover:bg-primary/5 transition-all flex items-center justify-between group"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
-                        <span className="text-sm font-bold text-primary">{set.setNumber}</span>
-                      </div>
-                      <div className="text-left">
-                        <p className="font-medium text-foreground">{set.label}</p>
-                        <p className="text-xs text-muted-foreground">{set.questionCount} questions</p>
-                      </div>
-                    </div>
-                    <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
-                  </button>
-                ))
-              )}
-            </CardContent>
-          </Card>
-        </div>
+        <ChapterHubModal
+          chapter={selectedChapter}
+          onClose={() => setSelectedChapter(null)}
+          onSelectSet={handleSetClick}
+          isPaidUser={isPaidUser}
+        />
       )}
 
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "11" | "12" | "pyq")}>

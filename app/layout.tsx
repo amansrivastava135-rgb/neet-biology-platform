@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { Inter, Merriweather } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
+import { PWAInstall } from '@/components/pwa-install'
 import './globals.css'
 
 const inter = Inter({ 
@@ -29,19 +30,19 @@ export const metadata: Metadata = {
   creator: 'MASTER360',
   metadataBase: new URL('https://master360.vercel.app'),
   openGraph: {
-   type: 'website',
-   locale: 'en_IN',
-   url: 'https://master360.vercel.app',
-   siteName: 'MASTER360',
-   title: 'MASTER360 – NEET Biology Mock Tests, MCQs & PYQs Platform',
-   description: 'MASTER360 is a complete NEET Biology preparation platform with MCQs, PYQs, mock tests, and analytics.',
-   images: [{
-    url: '/og-image.png',
-    width: 1200,
-    height: 630,
-    alt: 'MASTER360 – NEET Biology Preparation Platform',
-   }],
- },
+    type: 'website',
+    locale: 'en_IN',
+    url: 'https://master360.vercel.app',
+    siteName: 'MASTER360',
+    title: 'MASTER360 – NEET Biology Mock Tests, MCQs & PYQs Platform',
+    description: 'MASTER360 is a complete NEET Biology preparation platform with MCQs, PYQs, mock tests, and analytics.',
+    images: [{
+      url: '/og-image.png',
+      width: 1200,
+      height: 630,
+      alt: 'MASTER360 – NEET Biology Preparation Platform',
+    }],
+  },
   twitter: {
     card: 'summary_large_image',
     title: 'MASTER360 – NEET Biology Preparation Platform',
@@ -74,6 +75,7 @@ export default function RootLayout({
       </head>
       <body className={`${inter.variable} ${merriweather.variable} font-sans antialiased`}>
         {children}
+        <PWAInstall />
         <Analytics />
       </body>
     </html>

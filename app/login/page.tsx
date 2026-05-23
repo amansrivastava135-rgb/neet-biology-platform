@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -10,7 +10,15 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { BookOpen, Loader2, AlertCircle, Mail, KeyRound } from "lucide-react";
 import { useAuth, AuthProvider } from "@/lib/auth-context";
+import { GoogleButton } from "@/components/ui/google-button";
 import { track } from "@vercel/analytics";
+import { Suspense } from "react";
+
+const GOOGLE_ERROR_MESSAGES: Record<string, string> = {
+  google_denied: "Google sign-in was cancelled.",
+  google_failed: "Google sign-in failed. Please try again.",
+  google_unverified: "Your Google account email is not verified.",
+};
 
 function LoginForm() {
   const { login } = useAuth();
@@ -23,6 +31,15 @@ function LoginForm() {
   const [isLoading, setIsLoading] = useState(false);
   const [otpLoading, setOtpLoading] = useState(false);
   const router = useRouter();
+  const searchParams = useSearchParams();
+
+  // Show error from Google OAuth redirect
+  useEffect(() => {
+    const oauthError = searchParams.get("error");
+    if (oauthError && GOOGLE_ERROR_MESSAGES[oauthError]) {
+      setError(GOOGLE_ERROR_MESSAGES[oauthError]);
+    }
+  }, [searchParams]);
 
   const handleSendOTP = async () => {
     if (!email) {
@@ -52,46 +69,44 @@ function LoginForm() {
   };
 
   const handleOTPLogin = async () => {
-  if (!otp || otp.length !== 6) {
-    setError("Please enter valid 6-digit OTP");
-    return;
-  }
-  setError("");
-  setIsLoading(true);
-  try {
-    // Step 1 — verify OTP
-    const verifyRes = await fetch(
-      `/api/auth/send-otp?email=${encodeURIComponent(email)}&otp=${otp}`
-    );
-    const verifyData = await verifyRes.json();
-
-    if (!verifyData.valid) {
-      setError(verifyData.error || "Invalid OTP. Please try again.");
+    if (!otp || otp.length !== 6) {
+      setError("Please enter valid 6-digit OTP");
       return;
     }
+    setError("");
+    setIsLoading(true);
+    try {
+      const verifyRes = await fetch(
+        `/api/auth/send-otp?email=${encodeURIComponent(email)}&otp=${otp}`
+      );
+      const verifyData = await verifyRes.json();
 
-    // Step 2 — issue JWT via POST (OTP already consumed above)
-    const loginRes = await fetch("/api/auth/otp-login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email }),
-    });
-    const loginData = await loginRes.json();
+      if (!verifyData.valid) {
+        setError(verifyData.error || "Invalid OTP. Please try again.");
+        return;
+      }
 
-    if (loginRes.ok && loginData.user) {
-      track("login_success", { method: "otp" });
-      localStorage.setItem("neet_user", JSON.stringify(loginData.user));
-      router.push(loginData.user?.isAdmin ? "/admin" : "/dashboard");
-    } else {
-      track("login_failed", { method: "otp" });
-      setError(loginData.error || "No account found. Please sign up first.");
+      const loginRes = await fetch("/api/auth/otp-login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+      const loginData = await loginRes.json();
+
+      if (loginRes.ok && loginData.user) {
+        track("login_success", { method: "otp" });
+        localStorage.setItem("neet_user", JSON.stringify(loginData.user));
+        router.push(loginData.user?.isAdmin ? "/admin" : "/dashboard");
+      } else {
+        track("login_failed", { method: "otp" });
+        setError(loginData.error || "No account found. Please sign up first.");
+      }
+    } catch {
+      setError("Something went wrong. Please try again.");
+    } finally {
+      setIsLoading(false);
     }
-  } catch {
-    setError("Something went wrong. Please try again.");
-  } finally {
-    setIsLoading(false);
-  }
-};
+  };
 
   const handlePasswordLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -137,9 +152,20 @@ function LoginForm() {
               Sign in to continue your NEET Biology preparation
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-5">
+
+            {/* Google Button */}
+            <GoogleButton label="Continue with Google" />
+
+            {/* Divider */}
+            <div className="flex items-center gap-3">
+              <div className="flex-1 h-px bg-border" />
+              <span className="text-xs text-muted-foreground">or</span>
+              <div className="flex-1 h-px bg-border" />
+            </div>
+
             {/* Login Method Toggle */}
-            <div className="flex gap-2 mb-6 p-1 bg-muted rounded-lg">
+            <div className="flex gap-2 p-1 bg-muted rounded-lg">
               <button
                 onClick={() => { setLoginMethod("password"); setError(""); setOtpSent(false); }}
                 className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-md text-sm font-medium transition-colors ${
@@ -165,7 +191,7 @@ function LoginForm() {
             </div>
 
             {error && (
-              <Alert variant="destructive" className="mb-4">
+              <Alert variant="destructive">
                 <AlertCircle className="h-4 w-4" />
                 <AlertDescription>{error}</AlertDescription>
               </Alert>
@@ -188,19 +214,19 @@ function LoginForm() {
                 </div>
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
-                  <Label htmlFor="password">Password</Label>
-                  <Link href="/forgot-password" className="text-xs text-primary hover:underline">
-                    Forgot Password?
-                  </Link>
+                    <Label htmlFor="password">Password</Label>
+                    <Link href="/forgot-password" className="text-xs text-primary hover:underline">
+                      Forgot Password?
+                    </Link>
                   </div>
-                 <Input
-                   id="password"
-                   type="password"
-                   placeholder="Enter your password"
-                   value={password}
-                   onChange={(e) => setPassword(e.target.value)}
-                   required
-                   disabled={isLoading}
+                  <Input
+                    id="password"
+                    type="password"
+                    placeholder="Enter your password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    disabled={isLoading}
                   />
                 </div>
                 <Button type="submit" className="w-full" disabled={isLoading}>
@@ -274,7 +300,7 @@ function LoginForm() {
               </div>
             )}
 
-            <div className="mt-6 text-center text-sm">
+            <div className="text-center text-sm">
               <span className="text-muted-foreground">{"Don't have an account? "}</span>
               <Link href="/signup" className="text-primary hover:underline font-medium">
                 Sign up
@@ -291,10 +317,22 @@ function LoginForm() {
   );
 }
 
+function LoginFormWithSuspense() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    }>
+      <LoginForm />
+    </Suspense>
+  );
+}
+
 export default function LoginPage() {
   return (
     <AuthProvider>
-      <LoginForm />
+      <LoginFormWithSuspense />
     </AuthProvider>
   );
 }

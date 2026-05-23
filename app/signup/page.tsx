@@ -10,6 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { BookOpen, Loader2, AlertCircle, Check } from "lucide-react";
 import { useAuth, AuthProvider } from "@/lib/auth-context";
+import { GoogleButton } from "@/components/ui/google-button";
 import { track } from "@vercel/analytics";
 
 function SignupForm() {
@@ -51,7 +52,7 @@ function SignupForm() {
         }
       } else {
         track("signup_failed", { reason: "email_exists" });
-        setError("Email already registered. Please use a different email.");
+        setError("Email already registered. Please sign in instead.");
       }
     } catch {
       setError("An error occurred. Please try again.");
@@ -82,7 +83,19 @@ function SignupForm() {
               Start your NEET Biology preparation journey today
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-5">
+
+            {/* Google Button */}
+            <GoogleButton label="Sign up with Google" />
+
+            {/* Divider */}
+            <div className="flex items-center gap-3">
+              <div className="flex-1 h-px bg-border" />
+              <span className="text-xs text-muted-foreground">or</span>
+              <div className="flex-1 h-px bg-border" />
+            </div>
+
+            {/* Email/Password Form */}
             <form onSubmit={handleSubmit} className="space-y-4">
               {error && (
                 <Alert variant="destructive">
@@ -145,37 +158,30 @@ function SignupForm() {
 
               <Button type="submit" className="w-full" disabled={isLoading}>
                 {isLoading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Creating account...
-                  </>
-                ) : (
-                  "Create Account"
-                )}
+                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Creating account...</>
+                ) : "Create Account"}
               </Button>
             </form>
 
-            <div className="mt-6">
-              <div className="bg-muted p-4 rounded-lg space-y-2">
-                <p className="text-sm font-medium text-foreground">Free account includes:</p>
-                <ul className="text-sm text-muted-foreground space-y-1">
-                  <li className="flex items-center gap-2">
-                    <Check className="h-4 w-4 text-primary" />
-                    10 Demo Questions
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <Check className="h-4 w-4 text-primary" />
-                    Mock Test Preview
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <Check className="h-4 w-4 text-primary" />
-                    Progress Tracking
-                  </li>
-                </ul>
-              </div>
+            <div className="bg-muted p-4 rounded-lg space-y-2">
+              <p className="text-sm font-medium text-foreground">Free account includes:</p>
+              <ul className="text-sm text-muted-foreground space-y-1">
+                <li className="flex items-center gap-2">
+                  <Check className="h-4 w-4 text-primary" />
+                  10 Demo Questions
+                </li>
+                <li className="flex items-center gap-2">
+                  <Check className="h-4 w-4 text-primary" />
+                  Mock Test Preview
+                </li>
+                <li className="flex items-center gap-2">
+                  <Check className="h-4 w-4 text-primary" />
+                  Progress Tracking
+                </li>
+              </ul>
             </div>
 
-            <div className="mt-6 text-center text-sm">
+            <div className="text-center text-sm">
               <span className="text-muted-foreground">Already have an account? </span>
               <Link href="/login" className="text-primary hover:underline font-medium">
                 Sign in
@@ -185,9 +191,7 @@ function SignupForm() {
         </Card>
 
         <p className="text-center text-sm text-muted-foreground mt-6">
-          <Link href="/" className="hover:text-foreground">
-            Back to Home
-          </Link>
+          <Link href="/" className="hover:text-foreground">Back to Home</Link>
         </p>
       </div>
     </div>

@@ -8,7 +8,7 @@ export const metadata: Metadata = {
     title: "NEET Biology Mock Tests — MASTER360",
     description:
       "Full-length NEET pattern mock tests with 90 questions, timer, and detailed analytics. Prepare smarter with MASTER360.",
-    url: "https://master360.vercel.app/mock-test",
+    url: "https://master360.in/mock-test",
   },
 };
 

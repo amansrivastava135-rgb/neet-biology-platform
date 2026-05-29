@@ -8,7 +8,7 @@ export const metadata: Metadata = {
     title: "MASTER360 Result History — NEET Biology",
     description:
       "Your complete NEET Biology test history — mock tests, chapter practice, scores, and accuracy trends.",
-    url: "https://master360.vercel.app/results",
+    url: "https://master360.in/results",
   },
   robots: { index: false, follow: false }, // private page — index nahi hona chahiye
 };

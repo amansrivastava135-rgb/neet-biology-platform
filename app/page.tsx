@@ -17,7 +17,7 @@ export const metadata: Metadata = {
     title: "MASTER360 – NEET Biology Mock Tests, MCQs & PYQs Platform",
     description:
       "MASTER360: 3800+ MCQs, PYQs, mock tests, and performance analytics for NEET Biology by Dr. Amankumar Srivastav.",
-    url: "https://master360.vercel.app",
+    url: "https://master360.in",
   },
 };
 

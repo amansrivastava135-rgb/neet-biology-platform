@@ -8,7 +8,7 @@ export const metadata: Metadata = {
     title: "MASTER360 Pricing — NEET Biology Plans",
     description:
       "Affordable NEET Biology preparation plans starting at ₹29. Get access to 3800+ MCQs, PYQs (2010–2024), and full mock tests.",
-    url: "https://master360.vercel.app/pricing",
+    url: "https://master360.in/pricing",
   },
 };
 

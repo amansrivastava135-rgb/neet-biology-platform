@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { ResultPage, ResultPageProps } from "@/components/test-engine/ResultPage";
 

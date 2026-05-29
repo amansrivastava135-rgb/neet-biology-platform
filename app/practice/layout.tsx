@@ -8,7 +8,7 @@ export const metadata: Metadata = {
     title: "NEET Biology Chapter Practice — MASTER360",
     description:
       "38 chapters, 3800+ MCQs, NCERT-based explanations. Practice NEET Biology chapter-wise on MASTER360.",
-    url: "https://master360.vercel.app/practice",
+    url: "https://master360.in/practice",
   },
 };
 

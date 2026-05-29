@@ -14,6 +14,6 @@ export default function robots(): MetadataRoute.Robots {
         "/api/",
       ],
     },
-    sitemap: "https://master360.vercel.app/sitemap.xml",
+    sitemap: "https://master360.in/sitemap.xml",
   };
 }

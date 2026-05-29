@@ -28,11 +28,11 @@ export const metadata: Metadata = {
   ],
   authors: [{ name: 'Dr. Amankumar Srivastav' }],
   creator: 'MASTER360',
-  metadataBase: new URL('https://master360.vercel.app'),
+  metadataBase: new URL('https://master360.in'),
   openGraph: {
     type: 'website',
     locale: 'en_IN',
-    url: 'https://master360.vercel.app',
+    url: 'https://master360.in',
     siteName: 'MASTER360',
     title: 'MASTER360 – NEET Biology Mock Tests, MCQs & PYQs Platform',
     description: 'MASTER360 is a complete NEET Biology preparation platform with MCQs, PYQs, mock tests, and analytics.',

@@ -8,7 +8,7 @@ export const metadata: Metadata = {
     title: "MASTER360 Dashboard — NEET Biology Progress Tracker",
     description:
       "Monitor your NEET Biology preparation with detailed analytics, weak chapter analysis, and test history.",
-    url: "https://master360.vercel.app/dashboard",
+    url: "https://master360.in/dashboard",
   },
   robots: { index: false, follow: false }, // dashboard index nahi hona chahiye
 };

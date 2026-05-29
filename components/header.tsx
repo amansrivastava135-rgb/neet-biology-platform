@@ -49,6 +49,12 @@ export function Header() {
             Mock Tests
           </Link>
           <Link
+            href="/resources"
+            className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+          >
+            Resources
+          </Link>
+          <Link
             href="/pricing"
             className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
           >
@@ -183,6 +189,13 @@ export function Header() {
               onClick={() => setMobileMenuOpen(false)}
             >
               Mock Tests
+            </Link>
+            <Link
+              href="/resources"
+              className="px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors"
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              Resources
             </Link>
             <Link
               href="/pricing"

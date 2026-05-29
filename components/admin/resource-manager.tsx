@@ -21,12 +21,25 @@ const allChapters = [
   ...class12Chapters.map((c) => ({ ...c, class: 12 })),
 ];
 
-const RESOURCE_TYPES = [
-  { value: "roadmap", label: "Study Plan", description: "Roadmap PDF" },
+// Chapter-specific resource types (chapterId 1-38)
+const CHAPTER_RESOURCE_TYPES = [
+  { value: "roadmap",      label: "Study Plan",        description: "Roadmap PDF" },
   { value: "intelligence", label: "Intelligence Module", description: "RE-NEET intelligence PDF" },
-  { value: "revision", label: "Revision Notes", description: "Quick revision PDF" },
-  { value: "pyq-analysis", label: "PYQ Analysis", description: "PYQ pattern analysis PDF" },
+  { value: "revision",     label: "Revision Notes",    description: "Quick revision PDF" },
+  { value: "pyq-analysis", label: "PYQ Analysis",      description: "PYQ pattern analysis PDF" },
 ];
+
+// Combined/general resource types (chapterId = 0)
+const COMBINED_RESOURCE_TYPES = [
+  { value: "combined-notes",   label: "Complete Notes",     description: "e.g. Complete Class 11 Biology Notes" },
+  { value: "revision-booklet", label: "Revision Booklet",   description: "Multi-chapter revision PDF" },
+  { value: "pyq-compilation",  label: "PYQ Compilation",    description: "Year-wise or topic-wise PYQ PDF" },
+  { value: "ncert-highlights", label: "NCERT Highlights",   description: "Highlighted NCERT PDF" },
+  { value: "handbook",         label: "Handbook",           description: "Reference handbook PDF" },
+];
+
+// chapterId = 0 means combined/general resource
+const COMBINED_CHAPTER_ID = 0;
 
 type Resource = {
   id: string;
@@ -44,14 +57,14 @@ type UploadState =
   | { status: "success"; message: string }
   | { status: "error"; message: string };
 
+type Mode = "chapter" | "combined";
+
 async function fetchResourcesForChapter(chapterId: number): Promise<Resource[]> {
   try {
-    // Admin can use a direct supabase query via admin API — we reuse /api/resources
-    // but need all resources including inactive for admin view
-    // For now fetch active only — extend later with admin-specific endpoint if needed
-    const res = await fetch(`/api/resources?chapterId=${chapterId}`, {
-      credentials: "include",
-    });
+    const url = chapterId === COMBINED_CHAPTER_ID
+      ? "/api/resources"
+      : `/api/resources?chapterId=${chapterId}`;
+    const res = await fetch(url, { credentials: "include" });
     if (!res.ok) return [];
     const data = await res.json();
     return data.resources || [];
@@ -73,8 +86,13 @@ async function deleteResource(id: string): Promise<boolean> {
 }
 
 export function ResourceManager() {
+  const [mode, setMode] = useState<Mode>("combined");
+
+  // Chapter mode state
   const [selectedChapterId, setSelectedChapterId] = useState<number>(1);
-  const [resourceType, setResourceType] = useState<string>("roadmap");
+
+  // Shared upload state
+  const [resourceType, setResourceType] = useState<string>("combined-notes");
   const [title, setTitle] = useState<string>("");
   const [description, setDescription] = useState<string>("");
   const [file, setFile] = useState<File | null>(null);
@@ -86,23 +104,36 @@ export function ResourceManager() {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const currentChapterId = mode === "combined" ? COMBINED_CHAPTER_ID : selectedChapterId;
   const selectedChapter = allChapters.find((c) => c.id === selectedChapterId);
+  const currentResourceTypes = mode === "combined" ? COMBINED_RESOURCE_TYPES : CHAPTER_RESOURCE_TYPES;
 
-  // Load resources whenever chapter changes
+  // Reset resource type when mode changes
+  useEffect(() => {
+    if (mode === "combined") {
+      setResourceType("combined-notes");
+    } else {
+      setResourceType("roadmap");
+    }
+    setUploadState({ status: "idle" });
+    setFile(null);
+  }, [mode]);
+
+  // Load resources when chapter/mode changes
   useEffect(() => {
     setResourcesLoading(true);
-    fetchResourcesForChapter(selectedChapterId).then((r) => {
+    fetchResourcesForChapter(currentChapterId).then((r) => {
       setResources(r);
       setResourcesLoading(false);
     });
-  }, [selectedChapterId]);
+  }, [currentChapterId]);
 
-  // Auto-fill title based on chapter + type
+  // Auto-fill title for chapter mode
   useEffect(() => {
-    if (!selectedChapter) return;
-    const typeLabel = RESOURCE_TYPES.find((t) => t.value === resourceType)?.label ?? "";
+    if (mode !== "chapter" || !selectedChapter) return;
+    const typeLabel = CHAPTER_RESOURCE_TYPES.find((t) => t.value === resourceType)?.label ?? "";
     setTitle(`${selectedChapter.name} — ${typeLabel}`);
-  }, [selectedChapterId, resourceType, selectedChapter]);
+  }, [selectedChapterId, resourceType, selectedChapter, mode]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
@@ -111,8 +142,8 @@ export function ResourceManager() {
       setUploadState({ status: "error", message: "Only PDF files are allowed." });
       return;
     }
-    if (f.size > 20 * 1024 * 1024) {
-      setUploadState({ status: "error", message: "File must be under 20 MB." });
+    if (f.size > 50 * 1024 * 1024) {
+      setUploadState({ status: "error", message: "File must be under 50 MB." });
       return;
     }
     setFile(f);
@@ -128,14 +159,14 @@ export function ResourceManager() {
     setUploadState({ status: "uploading", progress: 0 });
 
     try {
-      // Step 1: Get signed upload URL from our API
+      // Step 1: Get signed upload URL
       const urlRes = await fetch("/api/resources/upload-url", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({
           fileName: file.name,
-          chapterId: selectedChapterId,
+          chapterId: currentChapterId,
           resourceType,
         }),
       });
@@ -147,10 +178,9 @@ export function ResourceManager() {
       }
 
       const { uploadUrl, storagePath } = await urlRes.json();
-
       setUploadState({ status: "uploading", progress: 30 });
 
-      // Step 2: Upload file directly to Supabase Storage
+      // Step 2: Upload file to Supabase Storage
       const uploadRes = await fetch(uploadUrl, {
         method: "PUT",
         headers: { "Content-Type": "application/pdf" },
@@ -170,7 +200,7 @@ export function ResourceManager() {
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({
-          chapterId: selectedChapterId,
+          chapterId: currentChapterId,
           resourceType,
           title: title.trim(),
           description: description.trim() || null,
@@ -189,11 +219,12 @@ export function ResourceManager() {
       // Reset form
       setFile(null);
       setDescription("");
+      if (mode === "combined") setTitle("");
       if (fileInputRef.current) fileInputRef.current.value = "";
 
       // Reload resources list
       setResourcesLoading(true);
-      fetchResourcesForChapter(selectedChapterId).then((r) => {
+      fetchResourcesForChapter(currentChapterId).then((r) => {
         setResources(r);
         setResourcesLoading(false);
       });
@@ -213,57 +244,78 @@ export function ResourceManager() {
     setDeletingId(null);
   };
 
+  const allResourceTypes = [...CHAPTER_RESOURCE_TYPES, ...COMBINED_RESOURCE_TYPES];
+
   return (
     <div className="space-y-8">
+      {/* Mode toggle */}
+      <div className="flex gap-2 p-1 bg-muted rounded-lg w-fit">
+        <button
+          onClick={() => setMode("combined")}
+          className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+            mode === "combined"
+              ? "bg-background text-foreground shadow-sm"
+              : "text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          📚 Combined / General
+        </button>
+        <button
+          onClick={() => setMode("chapter")}
+          className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+            mode === "chapter"
+              ? "bg-background text-foreground shadow-sm"
+              : "text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          📖 Chapter-Specific
+        </button>
+      </div>
+
       {/* Upload Section */}
       <Card className="border-border">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+          <CardTitle className="flex items-center gap-2 text-base">
             <Plus className="h-5 w-5" />
-            Upload Chapter Resource
+            {mode === "combined" ? "Upload Combined / General Resource" : "Upload Chapter Resource"}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-5">
-          {/* Chapter selector */}
-          <div>
-            <label className="block text-sm font-medium text-foreground mb-1.5">
-              Chapter
-            </label>
-            <div className="relative">
-              <select
-                value={selectedChapterId}
-                onChange={(e) => setSelectedChapterId(parseInt(e.target.value))}
-                className="w-full appearance-none border border-border rounded-lg px-3 py-2.5
-                  text-sm bg-background text-foreground pr-8 focus:outline-none focus:ring-2
-                  focus:ring-primary/30 focus:border-primary"
-              >
-                <optgroup label="Class 11">
-                  {class11Chapters.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      Ch {c.id} — {c.name}
-                    </option>
-                  ))}
-                </optgroup>
-                <optgroup label="Class 12">
-                  {class12Chapters.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      Ch {c.id} — {c.name}
-                    </option>
-                  ))}
-                </optgroup>
-              </select>
-              <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 h-4 w-4
-                text-muted-foreground pointer-events-none" />
+
+          {/* Chapter selector — only for chapter mode */}
+          {mode === "chapter" && (
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1.5">Chapter</label>
+              <div className="relative">
+                <select
+                  value={selectedChapterId}
+                  onChange={(e) => setSelectedChapterId(parseInt(e.target.value))}
+                  className="w-full appearance-none border border-border rounded-lg px-3 py-2.5
+                    text-sm bg-background text-foreground pr-8 focus:outline-none focus:ring-2
+                    focus:ring-primary/30 focus:border-primary"
+                >
+                  <optgroup label="Class 11">
+                    {class11Chapters.map((c) => (
+                      <option key={c.id} value={c.id}>Ch {c.id} — {c.name}</option>
+                    ))}
+                  </optgroup>
+                  <optgroup label="Class 12">
+                    {class12Chapters.map((c) => (
+                      <option key={c.id} value={c.id}>Ch {c.id} — {c.name}</option>
+                    ))}
+                  </optgroup>
+                </select>
+                <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 h-4 w-4
+                  text-muted-foreground pointer-events-none" />
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Resource type */}
           <div>
-            <label className="block text-sm font-medium text-foreground mb-1.5">
-              Resource Type
-            </label>
+            <label className="block text-sm font-medium text-foreground mb-1.5">Resource Type</label>
             <div className="grid grid-cols-2 gap-2">
-              {RESOURCE_TYPES.map((type) => (
+              {currentResourceTypes.map((type) => (
                 <button
                   key={type.value}
                   onClick={() => setResourceType(type.value)}
@@ -282,21 +334,23 @@ export function ResourceManager() {
 
           {/* Title */}
           <div>
-            <label className="block text-sm font-medium text-foreground mb-1.5">
-              Title
-            </label>
+            <label className="block text-sm font-medium text-foreground mb-1.5">Title</label>
             <input
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="Resource title shown to students"
+              placeholder={
+                mode === "combined"
+                  ? "e.g. Complete Class 11 Biology Notes"
+                  : "Resource title shown to students"
+              }
               className="w-full border border-border rounded-lg px-3 py-2.5 text-sm
                 bg-background text-foreground focus:outline-none focus:ring-2
                 focus:ring-primary/30 focus:border-primary"
             />
           </div>
 
-          {/* Description (optional) */}
+          {/* Description */}
           <div>
             <label className="block text-sm font-medium text-foreground mb-1.5">
               Description <span className="text-muted-foreground font-normal">(optional)</span>
@@ -315,7 +369,7 @@ export function ResourceManager() {
           {/* File picker */}
           <div>
             <label className="block text-sm font-medium text-foreground mb-1.5">
-              PDF File <span className="text-muted-foreground font-normal">(max 20 MB)</span>
+              PDF File <span className="text-muted-foreground font-normal">(max 50 MB)</span>
             </label>
             <div
               onClick={() => fileInputRef.current?.click()}
@@ -364,14 +418,14 @@ export function ResourceManager() {
             </div>
           )}
 
-          {/* Upload button */}
           <Button
             onClick={handleUpload}
             disabled={!file || !title.trim() || uploadState.status === "uploading"}
             className="w-full"
           >
             {uploadState.status === "uploading" ? (
-              <><Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                 {(uploadState as any).progress < 70 ? "Uploading file…" : "Saving record…"}
               </>
             ) : (
@@ -381,12 +435,14 @@ export function ResourceManager() {
         </CardContent>
       </Card>
 
-      {/* Existing Resources for selected chapter */}
+      {/* Existing Resources */}
       <Card className="border-border">
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle className="text-base">
-              Resources — Ch {selectedChapterId}: {selectedChapter?.name}
+              {mode === "combined"
+                ? "Combined / General Resources"
+                : `Resources — Ch ${selectedChapterId}: ${selectedChapter?.name}`}
             </CardTitle>
             {resourcesLoading && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
           </div>
@@ -399,13 +455,13 @@ export function ResourceManager() {
           ) : resources.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
               <FileText className="h-10 w-10 mx-auto mb-3 opacity-30" />
-              <p className="text-sm">No resources uploaded for this chapter yet.</p>
+              <p className="text-sm">No resources uploaded yet.</p>
             </div>
           ) : (
             <div className="space-y-3">
               {resources.map((resource) => {
                 const typeLabel =
-                  RESOURCE_TYPES.find((t) => t.value === resource.resource_type)?.label ??
+                  allResourceTypes.find((t) => t.value === resource.resource_type)?.label ??
                   resource.resource_type;
 
                 return (
@@ -421,9 +477,7 @@ export function ResourceManager() {
                           {resource.title}
                         </p>
                         <div className="flex items-center gap-2 mt-0.5">
-                          <Badge variant="secondary" className="text-xs">
-                            {typeLabel}
-                          </Badge>
+                          <Badge variant="secondary" className="text-xs">{typeLabel}</Badge>
                           {resource.description && (
                             <span className="text-xs text-muted-foreground truncate">
                               {resource.description}

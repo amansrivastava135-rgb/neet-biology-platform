@@ -5,8 +5,22 @@ import { supabaseAdmin } from "@/lib/supabase-server";
 const BUCKET = "chapter-resources";
 const SIGNED_URL_EXPIRES = 3600; // 1 hour
 
-// GET /api/resources?chapterId=N
-// Returns active resources for a chapter with fresh signed URLs
+export const VALID_RESOURCE_TYPES = [
+  // Chapter-specific types (existing)
+  "roadmap",
+  "intelligence",
+  "revision",
+  "pyq-analysis",
+  // Combined/general types (new)
+  "combined-notes",
+  "revision-booklet",
+  "pyq-compilation",
+  "ncert-highlights",
+  "handbook",
+];
+
+// GET /api/resources?chapterId=N  — chapter-specific resources
+// GET /api/resources               — combined/general resources (chapterId=0)
 export async function GET(req: NextRequest) {
   try {
     const user = await getCurrentUser();
@@ -14,22 +28,23 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // All paid plans can access resources
-    const isPaid = user.isPaid && (!user.subscriptionEnd || new Date(user.subscriptionEnd) > new Date());
+    const isPaid =
+      user.isPaid &&
+      (!user.subscriptionEnd || new Date(user.subscriptionEnd) > new Date());
     if (!isPaid) {
       return NextResponse.json({ error: "Premium required" }, { status: 403 });
     }
 
     const { searchParams } = new URL(req.url);
-    const chapterId = searchParams.get("chapterId");
-    if (!chapterId) {
-      return NextResponse.json({ error: "chapterId required" }, { status: 400 });
-    }
+    const chapterIdParam = searchParams.get("chapterId");
+
+    // If no chapterId → fetch combined resources (chapter_id = 0)
+    const chapterId = chapterIdParam !== null ? parseInt(chapterIdParam) : 0;
 
     const { data: resources, error } = await supabaseAdmin
       .from("chapter_resources")
       .select("id, chapter_id, resource_type, title, description, storage_path, is_active")
-      .eq("chapter_id", parseInt(chapterId))
+      .eq("chapter_id", chapterId)
       .eq("is_active", true)
       .order("resource_type");
 
@@ -65,8 +80,9 @@ export async function GET(req: NextRequest) {
   }
 }
 
-// POST /api/resources — admin only, creates a resource record after file is uploaded
+// POST /api/resources — admin only
 // Body: { chapterId, resourceType, title, description, storagePath }
+// chapterId = 0 for combined/general resources
 export async function POST(req: NextRequest) {
   try {
     const user = await getCurrentUser();
@@ -77,15 +93,14 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { chapterId, resourceType, title, description, storagePath } = body;
 
-    if (!chapterId || !resourceType || !title || !storagePath) {
+    if (chapterId === undefined || chapterId === null || !resourceType || !title || !storagePath) {
       return NextResponse.json(
         { error: "chapterId, resourceType, title, storagePath are required" },
         { status: 400 }
       );
     }
 
-    const validTypes = ["roadmap", "intelligence", "revision", "pyq-analysis"];
-    if (!validTypes.includes(resourceType)) {
+    if (!VALID_RESOURCE_TYPES.includes(resourceType)) {
       return NextResponse.json({ error: "Invalid resourceType" }, { status: 400 });
     }
 

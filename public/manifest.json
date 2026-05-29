@@ -1,7 +1,7 @@
 {
-  "name": "NEET Biology Platform",
-  "short_name": "NEET Bio",
-  "description": "Chapter-wise NEET Biology MCQs, PYQs aur Mock Tests",
+  "name": "MASTER360",
+  "short_name": "MASTER360",
+  "description": "Complete NEET Biology preparation with 3800+ MCQs, PYQs, and mock tests by Dr. Amankumar Srivastav",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",

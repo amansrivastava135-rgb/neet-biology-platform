@@ -51,7 +51,7 @@ export function MockTestInterface({
     async function loadQuestions() {
       setIsLoading(true);
 
-      // Specific mock test from Supabase — naam wahan se lo
+      //  Specific mock test from Supabase â€” fetch by ID
       if (mockTestId) {
         const { data: mockTest } = await supabase
           .from("mock_tests")
@@ -67,7 +67,7 @@ export function MockTestInterface({
 
           if (qs) {
             setQuestions(qs.map(convertToQuestion));
-            // Exact naam jo admin ne rakha hai — MOCK 1, MOCK 2 etc
+            // Use exact name set by admin â€” MOCK 1, MOCK 2 etc
             setTestLabel(mockTest.name);
           }
         }

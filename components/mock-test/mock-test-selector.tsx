@@ -126,7 +126,7 @@ export function MockTestSelector({ onStartTest, isPaidUser, isTrial = false }: M
             <p>✅ Each test has <strong>90 questions</strong></p>
             <p>✅ <strong>50% Class 11</strong> + <strong>50% Class 12</strong></p>
             <p>✅ Questions from <strong>all 38 chapters</strong></p>
-            <p>✅ <strong>90 minutes</strong> per Test</p>
+            <p>✅ <strong>60 minutes</strong> per Test</p>
           </CardContent>
         </Card>
       </div>
@@ -164,7 +164,7 @@ export function MockTestSelector({ onStartTest, isPaidUser, isTrial = false }: M
                     </div>
                     <div className="flex items-center gap-2 mb-4 text-xs text-muted-foreground">
                       <Clock className="h-3 w-3" />
-                      <span>90 Minutes</span>
+                      <span>60 minutes</span>
                       <Target className="h-3 w-3 ml-2" />
                       <span>Full Syllabus</span>
                     </div>
@@ -190,7 +190,7 @@ export function MockTestSelector({ onStartTest, isPaidUser, isTrial = false }: M
                       </div>
                       <div className="flex items-center gap-2 mb-4 text-xs text-muted-foreground">
                         <Clock className="h-3 w-3" />
-                        <span>90 Minutes</span>
+                        <span>60 minutes</span>
                         <Target className="h-3 w-3 ml-2" />
                         <span>Full Syllabus</span>
                       </div>
